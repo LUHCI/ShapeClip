@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>
+		<style>
+			document, body { background-color: black; color: white; } 
+			.sc_pad {
+				background-color: black;
+			}
+			
+			#colourwheel { position: fixed; bottom: 5cm; right: 15cm; }
+			#controls { position: fixed; bottom: 1cm; right: 1cm; }
+			#sugar { pointer-events: none; z-index: -99; position: fixed; bottom: 1cm; right: 1cm; color: #111; font-size: 5cm; font-family: 'Cabin', sans-serif; text-shadow: 1px 1px #222, -1px -1px #111}
+		</style>
+		
+		<!-- Import libraries -->
+		<script type="text/javascript" src="js/oop.js"></script>
+		<script type="text/javascript" src="js/Tween.js"></script>
+		<script type="text/javascript" src="js/RequestAnimationFrame.js"></script>
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<script type="text/javascript" src="js/raphael-min.js"></script>
+		<script type="text/javascript" src="js/colorwheel.js"></script>
+		
+		
+		
+		<script type="text/javascript">
+			
+			// Define a pad.
+			
+			function grayscale(fPercentage) {
+				var iHex = Number(parseInt((255 * fPercentage) , 10)).toString(16);
+				return "#" + iHex + iHex + iHex;
+			}
+			
+			/*
+			var Chain = Class.extend({
+				
+				init: function() {
+					
+					this.lAhain = [];
+					this.iIndex = 0;
+					this.bRunning = false;
+				},
+				
+				update : function() {
+					// work out the time since last time.
+					
+					// execute functions.
+					
+					// request the next frame.
+				},
+				
+				start : function() {
+				},
+				
+				stop : function() {
+				},
+				
+				add : function(jFunc, fTime) {
+				},
+				
+				append : function() {
+				},
+				
+				
+			});
+			var TimeoutChain = function()
+			{
+				var that = this;
+				this._timeoutHandler = null;    
+				this.chain = new Array();
+				this.currentStep = 0;
+				this.isRunning = false;
+				
+				
+				this.nextStep = function()
+				{
+					that.currentStep = that.currentStep +1;
+					if (that.currentStep == that.chain.length)
+					{
+						that.stop();
+					}
+					else
+					{
+						that.processCurrentStep();
+					}
+				},
+				
+				this.processCurrentStep = function(){
+					that._timeoutHandler = window.setTimeout(function(){
+						that.chain[that.currentStep].func();
+						that.nextStep();
+					},that.chain[that.currentStep].time);
+				},
+				
+				this.start =function(){
+					if (that.chain.length == 0)
+					{
+						return;
+					}
+					if (that.isRunning == true)
+					{
+						return;
+					}
+					that.isRunning = true;
+					that.currentStep = 0;
+					that.processCurrentStep();
+				},
+				
+				this.stop = function(){
+					that.isRunning = false;
+					window.clearTimeout(that._timeoutHandler)
+				},
+				
+				this.add = function(_function,_timeout){
+					that.chain[that.chain.length] = {func : _function, time : _timeout};
+				}
+			}
+			*/
+			
+			/**
+			 * @brief The Pad defines a place on a screen where a physical shape-changing actuator is placed.
+			 * A 'settings' parameter (dictionary) is taken by the constructor.
+			 * It contains a layer (pad.element()) which has the "sc_pad" classname.
+			 */
+			var Pad = Class.extend({
+				
+				/**
+				 * @brief Construct this pad.
+				 * @param settings The dictionary of arguments.
+				 *      settings.width  	- The total width of the pad (mm).
+				 *      settings.height 	- The total height of the pad (mm).
+				 *      settings.x   		- The horizontal centre position of the pad from the top-left of the screen (mm).
+				 *      settings.y   		- The vertical centre position of the pad from the top-left of the screen (mm).
+				 *      settings.angle   	- The rotation applied to this pad in degrees.  0 degrees is the top of the screen.
+				 *      settings.parent     - The parent element within which to add the pad.
+				 */
+				init: function(settings) {
+					
+					// Check the DOM is ready.
+					if (document.readyState != "complete")
+						throw "Page not ready.  Please only create pads when the page is ready.";
+					
+					// Check for required data.
+					if (settings.width === undefined || settings.height === undefined)
+						throw "Invalid size.  Specifiy width and height (mm).";
+					if ((settings.x || 10.00) < 0 || (settings.y || 10.00) < 0)
+						throw "Invalid position.  Specify positive numbers (mm).";
+					
+					// Get the parent element.
+					var parent = settings.parent || document.body;
+					
+					// Create a new DOM element layer for this pad's graphics.
+					this._element = document.createElement("div");
+					this._element.classList.add("sc_pad");
+					this._element.style.position = "fixed";
+					this._element.style["transform-origin"] = "50% 50%";
+					parent.appendChild(this._element);
+					
+					// Configure the pad dimensions.
+					this.size(settings.width, settings.height);
+					this.position(settings.x, settings.y);
+					this.rotate((settings.angle || 0.00) % 360.00);
+					this.outline(settings.outline || false);
+					
+				},
+				
+				/**
+				 * @brief Delete this pad.
+				 */
+				remove : function() { 
+					
+					// Remove the element from the DOM.
+					if (this._element)
+						this._element.remove();
+				},
+				
+				/**
+				 * @brief Get the base DOM node which represents this pad.
+				 * @return One DOM node (a 'div') which contains the pad graphics.
+				 */
+				element : function() {
+					return this._element;
+				},
+				
+				/**
+				 * @brief Calibrate this pad. Overridden by implementing classes.
+				 */
+				calibrate : function() {
+					// Nothing to do here.
+				},
+				
+				/**
+				 * @brief Show or hide the dashed outline of this pad.
+				 * that is useful for indicating where a shape-changing display should be placed.
+				 */
+				outline : function(show) {
+					if (arguments.length == 1)
+					{
+						this._outline = show;
+						this._element.style["box-sizing"] = "border-box";
+						this._element.style["border"] = (show ? "1px dashed white" : "none");
+						return this;
+					}
+					return this._outline;
+				},
+				
+				/**
+				 * @brief Get/Set the position of this pad (mm).
+				 * @param x The x position on screen (mm) defined by centre point.
+				 * @param y The y position on screen (mm) defined by centre point.
+				 * @return The position structure { x : X, y : Y }, or if no parameters are passed, the pad itself.
+				 */
+				position : function(x, y) {
+					
+					// If they are given, set width and height.
+					if (arguments.length == 2)
+					{
+						// Update local vars.
+						this._x = x;
+						this._y = y;
+						
+						// Update the shape.
+						this._element.style.left = (this._x - (this._width  * 0.5)) + "mm";
+						this._element.style.top  = (this._y - (this._height * 0.5)) + "mm";
+						
+						// Return this pad.
+						return this;
+					}
+					
+					// Otherwise return the size.
+					return { x : this._x, y : this._y };
+				},
+				
+				/**
+				 * @brief Get/Set the size of this pad (mm).
+				 * @param w The total width on screen (mm) for this pad to take up.
+				 * @param h The total height on screen (mm) for this pad to take up.
+				 * @return The size structure { width : X, height : Y }, or if no parameters are passed, the pad itself.
+				 */
+				size : function(w, h) {
+					
+					// If they are given, set width and height.
+					if (arguments.length == 2)
+					{
+						// Update local vars.
+						this._width  = w;
+						this._height = h;
+						
+						// Update the shape.
+						this._element.style.width  = this._width  + "mm";
+						this._element.style.height = this._height + "mm";
+						
+						// Return this pad.
+						return this;
+					}
+					
+					// Otherwise return the size.
+					return { width : this._width, height : this._height };
+				},
+				
+				/**
+				 * @brief Get/Set the rotation applied to this pad (mm).
+				 * @param degrees The rotation applied to this pad in degrees.  0 degrees is the top of the screen.
+				 * @return The angle of this pad, or if no parameters are passed, the pad itself. 
+				 */
+				rotate : function(degrees) {
+					
+					// If data is given, set it.
+					if (degrees === undefined)
+					{
+						this._angle = degrees;
+						this._element.style["transform"] = "rotate("+this._angle+"deg)";
+						return this;
+					}
+					
+					// Otherwise return the value.
+					return this._angle;
+				},
+			});
+			
+			
+			/**
+			 * @brief The ShapeClipv1 is a Pad which can move the ShapeClip v1 up and down.
+			 */
+			var ShapeClipv1 = Pad.extend({
+				
+				/**
+				 * @brief Construct this ShapeClipv1.
+				 * @param settings The dictionary of arguments.
+				 *      settings.width  	- The total width of the pad (mm).
+				 *      settings.height 	- The total height of the pad (mm).
+				 *      settings.x   		- The horizontal centre position of the pad from the top-left of the screen (mm).
+				 *      settings.y   		- The vertical centre position of the pad from the top-left of the screen (mm).
+				 *      settings.angle   	- The rotation applied to this pad in degrees.  0 degrees is the top of the screen.
+				 */
+				init : function(settings) {
+					
+					// Create the underlying pad.
+					this._super(settings);
+					
+					// Create an element for controlling LDR1
+					this._ldr1 = document.createElement("div");
+					this._ldr1.classList.add("sc_control");
+					this._ldr1.style.position = "absolute";
+					this._ldr1.style.width  = "50%";
+					this._ldr1.style.height = "100%";
+					this._ldr1.style.top    = "0px";
+					this._ldr1.style.left   = "0px";
+					this._ldr1.style["background-color"] = "white";
+					this._element.appendChild(this._ldr1);
+					
+					// Create an element for controlling LDR1
+					this._ldr2 = document.createElement("div");
+					this._ldr2.classList.add("sc_control");
+					this._ldr2.style.position = "absolute";
+					this._ldr2.style.width  = "50%";
+					this._ldr2.style.height = "100%";
+					this._ldr2.style.top    = "0px";
+					this._ldr2.style.left   = "50%";
+					this._ldr2.style["background-color"] = "black";
+					this._element.appendChild(this._ldr2);
+					
+					// LDR values.
+					this.ldr1(0.0);
+					this.ldr2(0.0);
+					
+					// RGB Signal Pattern.
+					this._signals = [255, 0,  0, 0, 0 ];
+				},
+				
+				/**
+				 * @brief Set/Get the value of LDR1 as a 0-1 percentage.
+				 * @param percent The value this LDR should transmit as a 0-1 percentage.
+				 * @return The percentage value of this LDR, or if no parameters are passed, the pad itself. 
+				 */
+				ldr1 : function(percent) {
+					
+					// If data is given, set it.
+					if (percent !== undefined)
+					{
+						if (percent < 0) percent = 0;
+						if (percent > 1) percent = 1;
+						this._fLDR1 = (percent * 100.0);
+						this._ldr1.style["background-color"] = "hsl(0,0%,"+this._fLDR1+"%)";
+						return this;
+					}
+					
+					// Otherwise return the value.
+					return (this._fLDR1 * 0.01);
+				},
+				
+				ldr1b : function(byte) {
+					if (byte !== undefined) { this.ldr1(byte / 255.0); return this; }
+					return parseInt(this.ldr1() * 255);
+				},
+				
+				ldr2b : function(byte) {
+					if (byte !== undefined) { this.ldr2(byte / 255.0); return this; }
+					return parseInt(this.ldr2() * 255);
+				},
+				
+				/**
+				 * @brief Set/Get the value of LDR2 as a 0-1 percentage.
+				 * @param percent The value this LDR should transmit as a 0-1 percentage.
+				 * @return The percentage value of this LDR, or if no parameters are passed, the pad itself. 
+				 */
+				ldr2 : function(percent) {
+					// If data is given, set it.
+					if (percent !== undefined)
+					{
+						if (percent < 0) percent = 0;
+						if (percent > 1) percent = 1;					
+						this._fLDR2 = (percent * 100.0);
+						this._ldr2.style["background-color"] = "hsl(0,0%,"+this._fLDR2+"%)";
+						return this;
+					}
+					
+					// Otherwise return the value.
+					return (this._fLDR2 * 0.01);
+				},
+				
+				/**
+				 * @brief Calibrate this pad. Overridden by implementing classes.
+				 */
+				calibrate : function() {
+					
+					var that = this;
+					
+					var wait_time = 50;		// The time an LDR has to sample.
+					var repeat = 20;			// The number of times to swap state.
+					var count = 0;				// The number of times state has swapped.
+					
+					var loop;
+					loop = function() {
+						++ count;
+						that.ldr1( (count % 2 == 0) ? 1.0 : 0.0 );
+						//that.ldr2( (count % 2 == 0) ? 0.0 : 1.0 );
+						if (count < repeat)
+							setTimeout(loop, wait_time);
+					};
+					loop();
+					
+					// Set the calibrating flag.
+					
+					/*
+					// Leave it in calibration mode.
+					var that = this;
+					
+					function fade() {
+						if (this.ldr1 <= 0 || this.ldr1 >= 1)
+							that.ldr1(this.ldr1);
+						if (this.ldr2 <= 0 || this.ldr2 >= 1)
+							that.ldr2(this.ldr2);
+					}
+					
+					var start  = { ldr1: 1.0, ldr2: 0.0 }
+					var target = { ldr1: 0.0, ldr2: 1.0 }
+					
+					var tween1 = new TWEEN.Tween(start).to(target, 500)
+						.onUpdate( fade )
+						.repeat( 5 ) // Infinity )
+						.yoyo( true );
+					tween1.start();
+					*/
+				},
+				
+				pulse : function() {
+					
+					var that = this;
+					
+					var pulse_width = 200;		// The time an LDR has to sample (ms).
+					
+					//var signals = [255, 0,  0, 255, 220 ] ;//128, 255, 128];	// How many signals can this carry. 2 clock + 3 data.
+					
+					var signal = 0;
+					var last = new Date().getTime();
+					var loop;
+					loop = function() {
+						
+						// Say time.
+						var curr = new Date().getTime();
+						//console.log("time since  = " + (curr-last));
+						last = curr;
+						
+						// Update graphics.
+						that.ldr1b( that._signals[signal] );
+						
+						// Increase signal and loop.
+						signal = ( signal + 1 ) % that._signals.length;
+						setTimeout(loop, pulse_width);
+					};
+					loop();
+					
+				},
+				
+				up : function() {
+					this.ldr1(this.ldr1() + 0.1);
+					this.ldr2(this.ldr2() + 0.1);
+				},
+				
+				down : function() {
+					this.ldr1(this.ldr1() - 0.1);
+					this.ldr2(this.ldr2() - 0.1);
+				},
+				
+				
+				
+				/** 
+				 * @brief Send a byte to LDR1.
+				 * Note: Speeds can be improved with setImmediate: http://ie.microsoft.com/testdrive/Performance/setImmediateSorting/Default.html
+				
+				_byte1 : function() {
+					
+					// Helper functions.
+					//var that = this;
+					//var bitSet = function(bit, byte) { return 1 << bit & byte }
+					var on  = function() { that.ldr1(1.0); }
+					var off = function() { that.ldr1(0.0); }
+					
+					
+					var wait;
+					wait = function(time) {
+						if time>
+						setTimeout(wait, 0);
+					};
+					
+					wait(on, 1000, on }
+					wait(off, 1000, off }
+					
+					var bExit = false;
+				//	while (!bExit) 
+				//	{
+				//		//this.ldr1(0.0);
+				//		sleep(1)
+				//		this.ldr1(1.0);
+				//		sleep(1)
+				//	}
+				}, */
+				
+			});
+			
+			
+			
+			
+			// show/hide/toggle -- NO because OFF drives the display too :)
+			
+			// force redraw -- http://www.webmasterworld.com/forum91/453.htm
+			var i = 0;
+			var b = false;
+			var s;
+			
+			var p1, p2;
+			function start() {
+				
+				p1 = new ShapeClipv1({x: 100, y: 100, width: 20, height: 20});
+				p1.outline(true);
+				
+				p2 = new ShapeClipv1({x: 300, y: 150, width: 20, height: 20});
+				p2.outline(true);
+				
+				p2.pulse();
+				
+				// Configure the UI Slider.
+				document.getElementById("motorSlider").onchange = function(e){
+					p2.ldr1(this.value * 0.01);
+				};
+				
+				// Configure the colour wheel.
+				var cw = Raphael.colorwheel($("#colourwheel")[0], 150);
+				cw.onchange(function(colour){
+					var r = parseInt(colour.r);
+					var g = parseInt(colour.g);
+					var b = parseInt(colour.b);
+					console.log(r + " " + g + " " + b);
+					p2._signals = [255, 0,  r, g, b ] 
+				});
+				
+				// Start the tween engine.
+				s = performance.now();
+				animate();
+			};
+			
+			function animate() {
+				requestAnimationFrame( animate );
+				TWEEN.update();
+				
+				/*
+				if (i < 10)
+				{
+					if (b) p2.ldr1(1.0);
+					else p2.ldr1(0.0);
+					b =!b;
+					//console.log(i);
+				}
+				if (i == 10)
+					console.log("time: " + (performance.now() - s));
+				
+				i ++;
+				*/
+			}
+			
+				// Based on: http://www.zovirl.com/2008/11/12/building-a-universal-remote-with-an-arduino/
+				// Integer to binary: Number(0xAA).toString(2)
+			
+			
+		</script>
+		
+	</head>
+	
+	<body onload="start()">
+		<div id="colourwheel"></div>
+		<div id="controls">
+			<button onclick="p2.up()">Up</button>
+			<button onclick="p2.down()">Down</button>
+			<input id="motorSlider" type="range" min="0" max="100" />
+		</div>
+		<div id="sugar"><span>ShapeClip</span><span>v1</span></div>
+	</body>
+	
+</html>

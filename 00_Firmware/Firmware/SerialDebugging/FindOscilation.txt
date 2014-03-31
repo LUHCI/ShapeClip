@@ -1,0 +1,90 @@
+void calibrateLDR() {
+	
+	// Constants
+	int TARGET 			= 200;		// Target a flash spacing of 250ms.
+	int TARGETERR 		= 20;		// Allow 20 ms error in capture timing.
+	int BRIGHTNESSERR	= 10;		// The amount of LDR sensor error to allow.
+	int ACTIVERANGE 	= 100;		// The minimum amount of range each LDR has seen before calibration.
+	
+	// Zero flags.
+	Serial.println("LDRs - Calibration Started");
+	//Serial.print("Flashes "); Serial.print(target); Serial.print("ms err: "); Serial.print(targetError); 
+	bLDRsCalibrated = false;
+	ldr1.calibrating = true;
+	ldr2.calibrating = true;
+	
+	// Define the ping pong variables.
+	long iLast = 0;				// The last valid ping detection.
+	boolean bMaxNext = false;	// Are we expecting the max or min value next?
+	int iPingStreak = 0;		// The number of correctly timed pings.
+	
+	// While not calibrated.
+	while (!bLDRsCalibrated)
+	{
+		// Get inputs.
+		processInputs();
+		
+		// Wait 10ms if the detected range is uninteresting.
+		if (abs(ldr1.max - ldr1.min) < ACTIVERANGE || abs(ldr2.max - ldr2.min) < ACTIVERANGE)
+		{
+			delay(10);
+			continue;
+		}
+		
+		// Compute what's happenin'.
+		boolean isMin = abs(ldr1.min - ldr1.raw) < BRIGHTNESSERR;
+		boolean isMax = abs(ldr1.max - ldr1.raw) < BRIGHTNESSERR;
+		
+		// If we are waiting for a max, check its there.
+		if (bMaxNext)
+		{
+			if (isMax)
+			{
+				// Was the ping timed correctly.
+				long iNow = millis();
+				if (abs((iNow - iLast) - TARGET) < TARGETERR)
+					++iPingStreak;
+				else
+					iPingStreak = 0;
+				
+				// Update vars.
+				iLast = iNow;
+				bMaxNext = !bMaxNext;
+				Serial.println("max");
+			}
+		}
+		else
+		{
+			if (isMin)
+			{
+				// Was the ping timed correctly.
+				long iNow = millis();
+				if (abs((iNow - iLast) - TARGET) < TARGETERR)
+					++iPingStreak;
+				else
+					iPingStreak = 0;
+				
+				// Update vars.
+				iLast = iNow;
+				bMaxNext = !bMaxNext;
+				Serial.println("min");
+			}
+		}
+		
+		
+		// If we have N correctly timed pings, say that calibration is done.
+		if (iPingStreak >= 10)
+		{
+			// Store the max and mins.
+			ldr1.calibrating = false;
+			ldr2.calibrating = false;
+			
+			// Break out of the loop.
+			bLDRsCalibrated = true;
+		}
+		
+	}
+	
+	// Update flags.
+	Serial.println("LDRs - Calibration Finished");
+}
