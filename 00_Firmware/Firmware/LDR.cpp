@@ -16,6 +16,6 @@ uint16_t LDR::sample() {
 	return value;
 }
 
-uint16_t LDR::mapMinMax(uint16_t value, long from, long to) {
-	return map(value, this->min, this->max, from, to);
+int32_t LDR::mapMinMax(int32_t value, long from, long to) {
+	return constrain(map(value, this->min, this->max, from, to), from, to);
 }

@@ -576,7 +576,11 @@
 				 * @return The height value as a 0-1 percentage, or if parameters are passed, the pad itself.
 				 */
 				height : function(value) {
-					if (value !== undefined) { this._signals[this.HEIGHT_IDX] = Math.floor(255 * value); return this; }
+					if (value !== undefined) {
+						this._signals[this.HEIGHT_IDX] = Math.floor(255 * value);
+						this._ldr2(value);
+						return this;
+					}
 					return parseInt(this._signals[this.HEIGHT_IDX] / 255);
 				},
 				

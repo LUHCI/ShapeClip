@@ -18,6 +18,7 @@
  
 /* Which version of the device are we compiling for. */
 //#define DEVICE_MKI
+#include "Interpolator.h"
 #include "LDR.h"
 #define DEVICE_MKIII
 
@@ -352,7 +353,8 @@ int8_t checkPulse() {
 		}
 		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 4) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Blue.
 			h = iLDRValue;
-			iTargetPos = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
+			//iTargetPos = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
+			ldr2.updateOffset(h - (int)ldr2.sample());
 		}
 		
 		// Ensure we are in a mode that displays a screen colour.
@@ -393,8 +395,9 @@ int8_t checkPulse() {
  * It will update the iTargetPos value with the height between 0 and MOTOR_TRAVEL.
  */
 void sampleHeight() {
-	uint16_t analogValue = ldr2.sample();
-	iTargetPos = ldr2.mapMinMax(analogValue, 0, MOTOR_TRAVEL);
+	int32_t analogValue = ldr2.adjustedSample();
+	//iTargetPos = ldr2.mapMinMax(analogValue, 0, MOTOR_TRAVEL);
+	iTargetPos = constrain(map(analogValue, iLDR1Min, iLDR1Max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
 }
 
 
@@ -570,7 +573,7 @@ void loop() {
 	if (bOnScreen)
 	{
 		// Update the target height.
-		//sampleHeight();
+		sampleHeight();
 		
 		// Move the motor in the direction of the target position.
 		moveMotor();

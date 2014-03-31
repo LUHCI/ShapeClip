@@ -14,16 +14,23 @@ class LDR
 	 int pin;
 	 uint16_t min;
 	 uint16_t max;
+	 int32_t offset;
 
  public:
 	 LDR(int pin) : pin(pin) {
 		this->min = 0x3FF;
 		this->max = 0;
+		this->offset = 0;
 	 }
 
 	// Samples the ADC using analogRead and averages over LDR__AVG_SAMPLE_COUNT samples.
 	uint16_t sample();
 
+	// Samples the ADC and adjusts according to the offset
+	int32_t adjustedSample() { (int32_t)this->sample() + this->offset; }
+
+	// updates the LDR offset
+	void updateOffset(int32_t offset) { this->offset = offset; }
 
 	// Returns the min value of the LDR seen so far
 	__inline__ uint16_t getMin() { return this->min; }
@@ -46,7 +53,7 @@ class LDR
 
 
 	// Maps a previously read value from min/max to from/to
-	uint16_t mapMinMax(uint16_t value, long from, long to);
+	int32_t mapMinMax(int32_t value, long from, long to);
 
 };
 
