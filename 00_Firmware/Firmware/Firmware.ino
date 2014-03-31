@@ -450,20 +450,12 @@ void updateColour() {
 				uint32_t currentColor = pRGB.getPixelColor(0);
 				
 				if(currentColor != RGB(iTargetR, iTargetG, iTargetB)) {
-					/*int stepRed = (iTargetR - RED(currentColor))     / 10;
-					if(abs(stepRed) <= 1) stepRed = iTargetR;
-					else             stepRed = RED(currentColor) + stepRed;
+					int stepRed   = constrain(map(10, 0, 100, RED(currentColor), iTargetR), 0, iTargetR);
+					int stepGreen = constrain(map(10, 0, 100, RED(currentColor), iTargetG), 0, iTargetG);
+					int stepBlue  = constrain(map(10, 0, 100, RED(currentColor), iTargetB), 0, iTargetB);
 
-					int stepGreen = (iTargetG - GREEN(currentColor)) / 10;
-					if(abs(stepGreen) <= 1) stepGreen = iTargetG;
-					else               stepGreen = GREEN(currentColor) + stepGreen;
-
-					int stepBlue = (iTargetB - BLUE(currentColor))   / 10;
-					if(abs(stepBlue) <= 1) stepBlue = iTargetB;
-					else              stepBlue = BLUE(currentColor) + stepBlue;
-
-					pRGB.setPixelColor(0,  stepRed, stepGreen, stepBlue);*/
-					 pRGB.setPixelColor(0,  iTargetR, iTargetG, iTargetB);
+					pRGB.setPixelColor(0,  stepRed, stepGreen, stepBlue);
+					//pRGB.setPixelColor(0,  iTargetR, iTargetG, iTargetB);
 				}
 			}
 			break;
