@@ -61,7 +61,7 @@
 
 /* LDR Settings and Sync Pulse Constants */
 const float SYNC_SIGNAL_DROP_THRESHOLD = 3.0f; 				// Based on the behaviour of the LDR with a 10k resistor on a Dell LCD monitor.
-const int PULSE_COUNT = 5;									// There are 5 pulses: high, low, r, g, b
+const int PULSE_COUNT = 6;									// There are 5 pulses: high, low, r, g, b, h
 const int PULSE_WIDTH = 200;								// The amount of time each pulse last.
 const int PULSE_WIDTH_ERR = 10;								// The amount of error in each pulse width start and end (~10ms due to 4ms timers in JS).
 const int DATA_WIDTH  = PULSE_WIDTH * PULSE_COUNT;			// The total amount of time for an entire data pulse.
@@ -285,7 +285,7 @@ int8_t checkPulse() {
 	// Define static variables.
 	static WindowVariance* pEstimatedMin = new WindowVariance(5);	// Running 
 	static WindowVariance* pEstimatedMax = new WindowVariance(5);
-	static int r=0; static int g=0; static int b=0;
+	static int r=0; static int g=0; static int b=0; static int h=0;
 	static float x1,x2,y1,y2 = 0;	// Required for slope differentials.
 	static float fSlope = 0.0f;		// Required for slope differentials.
 	static long iLastMinima = 0;	// The time of the last minimal (ms).
@@ -331,7 +331,7 @@ int8_t checkPulse() {
 			iLDR1Min = pEstimatedMin->mean();
 			ldr2.updateMin(iLDR1Min);
 		}
-		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 4) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Max.
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 5) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Max.
 			pEstimatedMax->push(iLDRValue);
 			iLDR1Max = pEstimatedMax->mean();
 			ldr2.updateMax(iLDR1Max);
@@ -349,6 +349,10 @@ int8_t checkPulse() {
 		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 3) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Blue.
 			b = iLDRValue;
 			iTargetB = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 4) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Blue.
+			h = iLDRValue;
+			iTargetPos = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
 		}
 		
 		// Ensure we are in a mode that displays a screen colour.
@@ -422,12 +426,13 @@ void moveMotor() {
 	}
 	*/
 	
-	// Move downwards one step. <-- THIS COMMENT IS WRONG!!!!
 	if (abs(iDelta) > 20)
 	{
 		int step = iDelta >= 0 ? 1 : -1;
 		motor.step(step);
 		iMotorPosition += step;
+	} else {
+		motor.shutdown();
 	}
 }
 
@@ -565,7 +570,7 @@ void loop() {
 	if (bOnScreen)
 	{
 		// Update the target height.
-		sampleHeight();
+		//sampleHeight();
 		
 		// Move the motor in the direction of the target position.
 		moveMotor();
