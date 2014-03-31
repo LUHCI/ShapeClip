@@ -428,6 +428,8 @@ void moveMotor() {
 		int step = iDelta >= 0 ? 1 : -1;
 		motor.step(step);
 		iMotorPosition += step;
+	} else {
+		motor.shutdown();
 	}
 }
 
@@ -493,16 +495,16 @@ void setup() {
 	// Wait two seconds.
 	Serial.println("hello world");
 	
-        // wait for a random time so that not all clips zero their motor at the same time
-        randomSeed(analogRead(PIN_RND));
-        uint16_t randomWait = random(1000);
-        delay(randomWait);
+		// wait for a random time so that not all clips zero their motor at the same time
+		randomSeed(analogRead(PIN_RND));
+		uint16_t randomWait = random(1000);
+		delay(randomWait);
 
 	// Bring the motor down until it hits the bottom.
 	zeroMotor();
 	
-        // make sure we all start at the same time
-        delay(1000 - randomWait);
+		// make sure we all start at the same time
+		delay(1000 - randomWait);
 }
 
 
