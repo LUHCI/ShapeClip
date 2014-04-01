@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>
+		<style>
+			document, body { background-color: black; color: white; } 
+			.sc_pad {
+				background-color: black;
+			}
+			
+			#colourwheel { position: fixed; bottom: 100px; left: 100px; }
+			#controls { position: fixed; bottom: 50px; left: 100px;  }
+			#sugar { pointer-events: none; z-index: -99; position: fixed; bottom: 1cm; right: 1cm; color: #111; font-size: 5cm; font-family: 'Cabin', sans-serif; text-shadow: 1px 1px #222, -1px -1px #111}
+		</style>
+		
+		<!-- Shape Clip -->
+		<script type="text/javascript" src="ShapeClipAPI.js"></script>
+		
+		<!-- JQuery -->
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<!-- Colour Wheel -->
+		<script type="text/javascript" src="js/raphael-min.js"></script>
+		<script type="text/javascript" src="js/colorwheel.js"></script>
+		
+		
+		
+		<script type="text/javascript">
+			
+			
+			var p1;
+			
+			function start() {
+				
+				// The size of the shape-clip pad in mm.
+				var SC_SIZE = __px(20);
+				
+				/**/
+				p1 = new ShapeClipv1({x: 300, y: 100, width: SC_SIZE, height: SC_SIZE});
+				p1.outline(true);
+				p1.pulse();
+				
+				// Configure the UI Slider.
+				document.getElementById("motorSlider").onchange = function(e){
+					p1.height(this.value * 0.01);
+				};
+				
+				// Configure the colour wheel.
+				var cw = Raphael.colorwheel($("#colourwheel")[0], 150);
+				cw.onchange(function(colour){
+					var r = parseInt(colour.r);
+					var g = parseInt(colour.g);
+					var b = parseInt(colour.b);
+					p1.colour(r, g, b);
+				});
+				
+				
+			};
+			
+			
+		</script>
+		
+	</head>
+	
+	<body onload="start()">
+		<div id="colourwheel"></div>
+		<div id="controls">
+			<input id="motorSlider" type="range" value="0" min="0" max="100" />
+		</div>
+		<div id="sugar"><span>ShapeClip</span><span>v1</span></div>
+	</body>
+	
+</html>
