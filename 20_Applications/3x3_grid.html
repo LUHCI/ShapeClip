@@ -17,7 +17,7 @@
 		</style>
 		
 		<!-- Shape Clip -->
-		<script type="text/javascript" src="ShapeClipAPI.js"></script>
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
 		
 		<!-- JQuery -->
 		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
@@ -45,11 +45,12 @@
 				{
 					for (var y = 0; y < 3; ++y)
 					{
-						var pX = X + (x * 25);
-						var pY = Y + (y * 25);
+						var pX = 100 + (x * 27); // 29
+						var pY = 100 + (y * 34); // 33
 						var pad = new ShapeClipv1({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
+						pad.rotate(180);
 						pads.push(pad);
 					}
 				}

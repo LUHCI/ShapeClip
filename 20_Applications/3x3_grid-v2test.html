@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>
+		<style>
+			document, body { background-color: black; color: white; } 
+			.sc_pad {
+				background-color: black;
+			}
+			
+			#colourwheel { position: fixed; bottom: 100px; left: 100px; }
+			#controls { position: fixed; bottom: 50px; left: 100px;  }
+			#sugar { pointer-events: none; z-index: -99; position: fixed; bottom: 1cm; right: 1cm; color: #111; font-size: 5cm; font-family: 'Cabin', sans-serif; text-shadow: 1px 1px #222, -1px -1px #111}
+		</style>
+		
+		<!-- Shape Clip -->
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI2.js"></script>
+		
+		<!-- JQuery -->
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<!-- Colour Wheel -->
+		<script type="text/javascript" src="js/raphael-min.js"></script>
+		<script type="text/javascript" src="js/colorwheel.js"></script>
+		
+		
+		
+		<script type="text/javascript">
+			
+			
+			var pads = [];
+			
+			function start() {
+				
+				// The size of the shape-clip pad in mm.
+				var SC_SIZE = __px(20);
+				var X = 50;
+				var Y = 50;
+				
+				// Create a large pad grid.
+				for (var x = 0; x < 3; ++x)
+				{
+					for (var y = 0; y < 3; ++y)
+					{
+						var pX = 100 + (x * 27); // 29
+						var pY = 100 + (y * 34); // 33
+						var pad = new ShapeClipv1({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						pad._id = "" + x + "x" + y;
+						pad.outline(true);
+						pad.rotate(180);
+						pads.push(pad);
+					}
+				}
+				
+				// Start the pads all at once.
+				for (var i=0; i<pads.length; ++i) pads[i].pulse();
+				
+				// Configure the UI Slider.
+				document.getElementById("motorSlider").onchange = function(e){
+					var value = this.value * 0.01;
+					for (var i=0; i<pads.length; ++i) pads[i].heightjv(value);
+				};
+				
+				// Configure the colour wheel.
+				var cw = Raphael.colorwheel($("#colourwheel")[0], 150);
+				cw.onchange(function(colour){
+					var r = parseInt(colour.r);
+					var g = parseInt(colour.g);
+					var b = parseInt(colour.b);
+					for (var i=0; i<pads.length; ++i) pads[i].colour(r, g, b);
+				});
+				
+				
+			};
+			
+			
+		</script>
+		
+	</head>
+	
+	<body onload="start()">
+		<div id="colourwheel"></div>
+		<div id="controls">
+			<input id="motorSlider" type="range" value="0" min="0" max="100" />
+		</div>
+		<div id="sugar"><span>ShapeClip</span><span>v2</span></div>
+	</body>
+	
+</html>
