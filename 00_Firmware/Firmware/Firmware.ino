@@ -477,7 +477,7 @@ void setup() {
 	eClipMode = EEPROM.read(EEMODEADDR);
 	if (eClipMode != EEMODE_SYNCPULSE && eClipMode != EEMODE_HEIGHTONLY)
 	{
-		EEPROM.write(EEMODEADDR, EEMODE_SYNCPULSE);
+		EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
 		eClipMode = EEMODE_HEIGHTONLY;
 	}
 	
