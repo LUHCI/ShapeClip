@@ -18,12 +18,13 @@
  
 /* Which version of the device are we compiling for. */
 //#define DEVICE_MKI
-#include "LDR.h"
 #define DEVICE_MKIII
-
+//#define SWBOT_MOTOR		// Use SWBOT as a motor stop?
+#define SWBOT_HEIGHT		// Use SWBOT as a height-only LDR read mode.
 
 /* External and 3rd party libraries. */ 
 #include <Math.h>
+#include <EEPROM.h>
 #include "CoolStepper.h" 
 #include "LDR.h"
 #include "Adafruit_NeoPixel.h"
@@ -43,7 +44,6 @@
 #define PIN_MIN21 6			// Motor Coil 2 + (digital).
 #define PIN_MIN22 7			// Motor Coil 2 - (digital).
 
-#define USE_SWBOT
 #ifdef DEVICE_MKI			// ** Specific to mkII and mkII.
 #define PIN_LDR1  A1		// The LDR1 input (analog).
 #define PIN_LDR2  A2		// The LDR2 input (analog).
@@ -57,7 +57,7 @@
 /* Motor characteristics */
 #define MOTOR_ANGLE 20		// The degrees turned with each motor step.
 #define MOTOR_SPEED 1500	// The motor speed in rotations per minute (RPMs).
-#define MOTOR_TRAVEL 450	// The number of steps to move the nut from the top to the bottom.
+#define MOTOR_TRAVEL 470	// The number of steps to move the nut from the top to the bottom.
 
 /* LDR Settings and Sync Pulse Constants */
 const float SYNC_SIGNAL_DROP_THRESHOLD = 3.0f; 				// Based on the behaviour of the LDR with a 10k resistor on a Dell LCD monitor.
@@ -76,12 +76,19 @@ const int SAMPLE_WINDOW = 90;								// The amount of time (ms) to sample the LD
 //#define SERIAL_SYNC_DEBUG		// Should sync pulse debug data be streamed via serial? csv: ms, r, g, b
 //#define SERIAL_SYNC_DEBUG2	// Should the verbose sync pulse debug data be streamed via serial? csv: ms, slope, max, r, g, b, min, raw
 
-#define NO_SYNC_PULSE_COLOUR RGB(255, 0, 0)
-
 #define RGBMODE_NONE     0		// The RGB LED displays nothing.
 #define RGBMODE_SCREEN   1		// The RGB LED displays the last colour the pulses detected.
 #define RGBMODE_NOSCREEN 2		// The RGB LED displays the "not on screen" pattern (i.e. no pulse detected).
-#define RGBMODE_SETUP    3		// The RGB LED displays the "setting up / calibrating" pattern.
+#define RGBMODE_STARTUP  3		// The RGB LED displays the "setting up / calibrating" pattern.
+
+#define EEMODEADDR 0			// The address of the mode stored in EEPROM.
+#define EEMODE_CHANGETIME 5000  // The number of ms to hold the switch before the clip mode is changed.
+#define EEMODE_SYNCPULSE 45		// The Clip looks for a sync pulse on one of the LDRs.
+#define EEMODE_HEIGHTONLY 37	// The Clip uses both LDRs to estimate height, no colour involved.
+
+#define PULSE_STATE__NOT_CHECKED  -1	// The sync-pulse routine did not bother checking, too soon since previous check.
+#define PULSE_STATE__NO_PULSE      0	// The sync-pulse check returned no pulse.. Probably off a screen.
+#define PULSE_STATE__ACTIVE_PULSE  1	// The sync-pulse check returned a pulse! It's probably on a screen.
 
 /* Colour manipulation macros. */
 #define RGB(r,g,b) 	(((r & 0xFF) << 16) | ((g & 0xFF) << 8)  | ((b & 0xFF) << 0))
@@ -138,22 +145,26 @@ boolean checkSample(int iRelativeTime, int iSampleOffset, int iWindowSize) {
 Stepper motor(MOTOR_ANGLE, PIN_MIN11, PIN_MIN12, PIN_MIN21, PIN_MIN22);
 Adafruit_NeoPixel pRGB = Adafruit_NeoPixel(1, PIN_RGB_OUT, NEO_GRB + NEO_KHZ800);
 
-
 boolean bMotorCalibrated = false;	// Is the motor position value accurate?
 int iMotorPosition = 0;				// The current number of steps in the motor.
 
-int eRGBMode = RGBMODE_NONE;	// Current RGB mode.
-bool bOnScreen = false;			// Is the shape clip device on the screen (i.e. does it have a valid sync pulse)?
-bool bLastOnScreen = false;		// As above, 1 state change behind.
+int eClipMode = EEMODE_SYNCPULSE;
+int eRGBMode = RGBMODE_NONE;		// Current RGB mode.
+bool bOnScreen = false;				// Is the shape clip device on the screen (i.e. does it have a valid sync pulse)?
+bool bLastOnScreen = false;			// As above, 1 state change behind.
 
-int iTargetR = 0;		// Target RED component.
-int iTargetG = 0;		// Target GREEN component.
-int iTargetB = 0;		// Target BLUE component.
-int iTargetPos = 0;		// Target MOTOR height (steps).
+int iTargetR = 0;					// Target RED component.
+int iTargetG = 0;					// Target GREEN component.
+int iTargetB = 0;					// Target BLUE component.
+int iTargetPos = 0;					// Target MOTOR height (steps).
 
-int iLDR1Min = 0;	// Current estimated LDR minimum.
-int iLDR1Max = 0;	// Current estimated LDR maximum.
+int iLDR1Min = 0;					// Current estimated LDR minimum.
+int iLDR1Max = 0;					// Current estimated LDR maximum.
 
+//int iLDR2Min = 0;					// Current estimated LDR minimum.
+//int iLDR2Max = 0;					// Current estimated LDR maximum.
+
+LDR ldr1(PIN_LDR1);
 LDR ldr2(PIN_LDR2);
 
 
@@ -193,27 +204,6 @@ void configure() {
 	// On-board LED (on).
 	digitalWrite(PIN_LED, HIGH);
 }
-
-/**
- * @brief Process the input signals.
-
-void processInputs() {
-	
-	// LDRs.
-	ldr1.update();
-	ldr2.update();
-	
-	// Top and Bottom switches and conditions.
-	boolean bTopTmp    	= digitalRead(PIN_SWTOP) == LOW;
-	boolean bBottomTmp 	= digitalRead(PIN_SWBOT) == LOW;
-	bTopChange			= bTopTmp == bTop;
-	bBottomChange 		= bBottomTmp == bBottom;
-	bTop 				= bTopTmp;
-	bBottom 			= bBottomTmp;
-	
-	// Serial messages?
-}
- */
  
 /**
  * @brief Print out information from the various sensors and estimated values.
@@ -245,14 +235,14 @@ void zeroMotor() {
 	
 	// Put us into setup mode (RGB LED).
 	int eLastMode = eRGBMode;
-	eRGBMode = RGBMODE_SETUP;
+	eRGBMode = RGBMODE_STARTUP;
 	updateColour();
 	
 	// Until the motor is calibrated, step down each time.
 	for(int iAvailableSteps = MOTOR_TRAVEL; iAvailableSteps >= 0; iAvailableSteps--) {
 		motor.step(-1);
-
-		#ifdef USE_SWBOT
+		
+		#ifdef SWBOT_MOTOR
 		if (digitalRead(PIN_SWBOT) == LOW) break;
 		#endif
 	}
@@ -260,6 +250,9 @@ void zeroMotor() {
 	// Set the motor position to 0 (known location).
 	bMotorCalibrated = true;
 	iMotorPosition = 0;
+	
+	// Shut the motor down.
+	motor.shutdown();
 	
 	// Take us out of setup mode.
 	eRGBMode = eLastMode;
@@ -272,9 +265,6 @@ void zeroMotor() {
  * It will update the iTargetR,G,B, iLDR1Max and iLDR1Min values if valid pulses are detected.
  * @return -1 if check not performed, 1 if we received an active pulse, 0 if we did not.
  */
-#define PULSE_STATE__NOT_CHECKED  -1
-#define PULSE_STATE__NO_PULSE      0
-#define PULSE_STATE__ACTIVE_PULSE  1
 int8_t checkPulse() {
 	
 	// Only allow this function to be called once every 5ms.
@@ -289,7 +279,6 @@ int8_t checkPulse() {
 	static float x1,x2,y1,y2 = 0;	// Required for slope differentials.
 	static float fSlope = 0.0f;		// Required for slope differentials.
 	static long iLastMinima = 0;	// The time of the last minimal (ms).
-	
 	
 	// Read the LDR and reset the serial debug colour values.
 	int iLDRValue = analogRead(PIN_LDR1);
@@ -389,10 +378,13 @@ int8_t checkPulse() {
  * It will update the iTargetPos value with the height between 0 and MOTOR_TRAVEL.
  */
 void sampleHeight() {
+	
+	// Sample a value from the LDR.
 	uint16_t analogValue = ldr2.sample();
+	
+	// Map it to the motor travel.
 	iTargetPos = ldr2.mapMinMax(analogValue, 0, MOTOR_TRAVEL);
 }
-
 
 /**
  * @brief Move the motor one step towards the target position.
@@ -405,30 +397,19 @@ void moveMotor() {
 	
 	// Compute the distance to travel.
 	int iDelta = iTargetPos - iMotorPosition;
-	/*
-	Serial.print(iTargetPos);
-	Serial.print(",");
-	Serial.print(iMotorPosition);
-	Serial.print(",");
-	Serial.println(iDelta);
-	*/
 	
-	/*
-	// Move upwards one step.
-	if (iDelta > 20)
+	// If we have to move over 1 step in either direction.
+	if (abs(iDelta) > 1)
 	{
-		motor.step(1);
-		iMotorPosition += 1;
-	}
-	*/
-	
-	// Move downwards one step. <-- THIS COMMENT IS WRONG!!!!
-	if (abs(iDelta) > 20)
-	{
+		// Move one step in the correct direction and update the motor position.
 		int step = iDelta >= 0 ? 1 : -1;
 		motor.step(step);
 		iMotorPosition += step;
-	} else {
+	}
+	
+	// Otherwise shut the motor down.
+	else
+	{
 		motor.shutdown();
 	}
 }
@@ -447,23 +428,27 @@ void updateColour() {
 			break;
 		case RGBMODE_SCREEN:
 			{
-				uint32_t currentColor = pRGB.getPixelColor(0);
+				// Go immediately to the new colour.
+				// pRGB.setPixelColor(0,  iTargetR, iTargetG, iTargetB);
 				
-				if(currentColor != RGB(iTargetR, iTargetG, iTargetB)) {
-					int stepRed   = constrain(map(10, 0, 100, RED(currentColor), iTargetR), 0, iTargetR);
-					int stepGreen = constrain(map(10, 0, 100, RED(currentColor), iTargetG), 0, iTargetG);
-					int stepBlue  = constrain(map(10, 0, 100, RED(currentColor), iTargetB), 0, iTargetB);
-
-					pRGB.setPixelColor(0,  stepRed, stepGreen, stepBlue);
-					//pRGB.setPixelColor(0,  iTargetR, iTargetG, iTargetB);
-				}
+				// Get 1% closer to the target colour each iteration.
+				uint32_t currentColor = pRGB.getPixelColor(0);
+				int stepRed   = constrain(map(10, 0, 1000, RED(currentColor),   iTargetR), 0, iTargetR);
+				int stepGreen = constrain(map(10, 0, 1000, GREEN(currentColor), iTargetG), 0, iTargetG);
+				int stepBlue  = constrain(map(10, 0, 1000, BLUE(currentColor),  iTargetB), 0, iTargetB);
+				
+				// Set the step value.
+				pRGB.setPixelColor(0,  stepRed, stepGreen, stepBlue);
 			}
 			break;
 		case RGBMODE_NOSCREEN:
-			pRGB.setPixelColor(0,  0, 0, 0);
+			pRGB.setPixelColor(0,  255, 0, 0);
 			break;
-		case RGBMODE_SETUP:
-			pRGB.setPixelColor(0,  0, 255, 0);
+		case RGBMODE_STARTUP:
+			if (eClipMode == EEMODE_HEIGHTONLY)
+				pRGB.setPixelColor(0,  0, 0, 255);
+			else
+				pRGB.setPixelColor(0,  0, 255, 0);
 			break;
 	}
 	
@@ -473,11 +458,12 @@ void updateColour() {
 
 
 
+
 /**
  * Setup the board and configure the pins.
  */
 void setup() { 
-
+	
 	// Configure the board and pins.
 	configure();
 	
@@ -487,30 +473,86 @@ void setup() {
 	// Wait two seconds.
 	Serial.println("hello world");
 	
-		// wait for a random time so that not all clips zero their motor at the same time
-		randomSeed(analogRead(PIN_RND));
-		uint16_t randomWait = random(1000);
-		delay(randomWait);
-
+	// Select a default clip mode from the set of possible modes, if one is not set.
+	eClipMode = EEPROM.read(EEMODEADDR);
+	if (eClipMode != EEMODE_SYNCPULSE && eClipMode != EEMODE_HEIGHTONLY)
+	{
+		EEPROM.write(EEMODEADDR, EEMODE_SYNCPULSE);
+		eClipMode = EEMODE_HEIGHTONLY;
+	}
+	
+	// Wait for a random time so that not all clips zero their motor at the same time.
+	randomSeed(analogRead(PIN_RND));
+	uint16_t randomWait = random(1000);
+	delay(randomWait);
+	
 	// Bring the motor down until it hits the bottom.
 	zeroMotor();
 	
-		// make sure we all start at the same time
-		delay(1000 - randomWait);
+	// make sure we all start at the same time
+	delay(1000 - randomWait);
+}
+
+/**
+ * @brief Detect a mode change by bridging SWBOT.
+ * Holding down SWBOT for 5s will change the clip mode from sync pulse (green startup)
+ * to height only (blue startup).
+ */
+void detectModeChange() {
+	
+	// Throttle this to 10hz.
+	static unsigned long tmrModeCheck = 0;
+	if (!cycleCheck(&tmrModeCheck, 10U))
+		return;
+	
+	// State for button press detection.
+	static long tmrButtonPress = -1;
+	static boolean bLastState  = true;
+	boolean bState = digitalRead(PIN_SWBOT) == LOW;
+	
+	// Store the time when we go from a not pressed to a pressed state.
+	if (bState == true && bLastState == false) 
+	{
+		tmrButtonPress = millis();
+	}
+	else if (bState == false && bLastState == true)
+	{
+		tmrButtonPress = -1;
+	}
+	bLastState = bState;
+	
+	// If SWBOT has been pressed for X seconds, switch mode.
+	if (tmrButtonPress != -1 && (millis() - tmrButtonPress) > EEMODE_CHANGETIME)
+	{
+		// Prevent it from triggering multiple times.
+		tmrButtonPress = -1;
+		
+		// Toggle mode.
+		int iMode = EEPROM.read(EEMODEADDR);
+		if (iMode == EEMODE_SYNCPULSE)
+		{
+			//Serial.println("height mode");
+			EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
+			eRGBMode  = RGBMODE_NONE;
+			eClipMode = EEMODE_HEIGHTONLY;
+		}
+		else
+		{
+			//Serial.println("sync pulse mode");
+			EEPROM.write(EEMODEADDR, EEMODE_SYNCPULSE);
+			eRGBMode  = RGBMODE_SCREEN;
+			eClipMode = EEMODE_SYNCPULSE;
+		}
+	}
 }
 
 
-
-
-
-
-
 /**
- * Logic loop.
- * The function performs the following tasks:
- *   - 
+ * @brief Handle the clip behaviour for sync pulse mode.
+ * This will wait for a pulse, and then display colour and height changes
+ * as appropriate.
  */
-void loop() {
+void loopSyncPulseMode() {
 	
 	// Sync with the RGB pulse.
 	int8_t ePulseState = checkPulse();
@@ -537,21 +579,8 @@ void loop() {
 		// Normal LED indicating it has no pulse.
 		digitalWrite(PIN_LED, LOW);
 		
-		// If it has been:
-		//	3s with no pulse:  flash no screen.
-		//  10s with no pulse: move motor to 0.
-		/*
-		if (10s has passed)
-		{
-			// Move motor to 0.
-			zeroMotor();
-		}
-		 else if (3s has passed)
-		{
-			// Flash red for 10s before going black.
-			eRGBMode = RGBMODE_NOSCREEN;
-		}
-		*/
+		// No pulse - reset max and min for LDR2.
+		ldr2.resetLimits();
 	}
 	
 	
@@ -574,39 +603,105 @@ void loop() {
 	if (cycleCheck(&tmrSerial, 500U))
 		debugSerial();
 	#endif
+}
+
+
+/**
+ * @brief Handle the clip behaviour for sync pulse mode.
+ * This will wait for a pulse, and then display colour and height changes
+ * as appropriate.
+ * Note - For some reason this sampling routine seems to run SUPER SLOW.
+ *      -  as a fix, I just run it at 10hz... ?!
+ */
+void loopHeightMode() {
 	
-	/*
-	// Stress the motor.
-	digitalWrite(PIN_LED, HIGH);
-	motor.step(-MOTOR_TRAVEL);
-	delay(1000);
-	digitalWrite(PIN_LED, LOW);
-	motor.step(MOTOR_TRAVEL);
-	delay(1000);
-	*/
+	// Determine historic variables for height sampling.
+	static WindowVariance* pMinAvg = new WindowVariance(5);
+	static WindowVariance* pMaxAvg = new WindowVariance(5);
 	
-	/*
-	// Get the target LDR value.
-	int iTargetPosition = ldr1.percent * MOTOR_TRAVEL;
-	int iDelta = iTargetPosition - iMotorPosition;
-	
-	// Remove noise. 
-	if ( abs(iDelta) > 10 )
+	static unsigned long tmrSample = 0;
+	if (cycleCheck(&tmrSample, 100U))
 	{
-		if (iDelta > 0)
+		// Push new data.
+		int iSample1 = ldr1.sample();
+		int iSample2 = ldr2.sample();
+		
+		// Compute the difference between the two means.
+		uint16_t iDelta = abs(iSample1 - iSample2);
+		
+		// If they are quite different, we are probably not on the screen.
+		boolean bOnScreen = iDelta <= 60;
+		
+		// If we are on screen for sure, update the max and mins and height.
+		if (bOnScreen)
 		{
-			motor.step(-1);
-			iMotorPosition += 1;
-			digitalWrite(PIN_LED, HIGH);
+			// Say we are on the screen.
+			eRGBMode = RGBMODE_NONE;
+			
+			// Sample.
+			uint16_t iMean = (iSample1 + iSample2) / 2;
+			
+			// Snap to means when in region.
+			int iMin = pMinAvg->mean();
+			int iMax = pMaxAvg->mean();
+			if (pMinAvg->count() == 0 || iMin + 20 > iMean) pMinAvg->push(iMean);
+			if (pMaxAvg->count() == 0 || iMax - 20 < iMean) pMaxAvg->push(iMean);
+			
+			// Target the motor position.
+			iTargetPos = constrain(map(iMean, iMin, iMax, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
+			
+			/*
+			Serial.print(bOnScreen ? 100 : 0); Serial.print(",");	
+			Serial.print(iMin); Serial.print(",");
+			Serial.print(iMax); Serial.print(",");
+			Serial.print(iMean); Serial.print("\n");
+			*/
 		}
 		else
 		{
-			motor.step(1);
-			iMotorPosition -= 1;
-			digitalWrite(PIN_LED, HIGH);
+			// Say we are not on the screen.
+			eRGBMode = RGBMODE_NOSCREEN;
+			
+			// Deflate max and min incase they got pushed too high or low?
+			//iMin = 0xFFF;
+			//iMax = 0x000;
 		}
 	}
-	*/
+	
+	// Update the colour and move the motor.
+	moveMotor();
+	updateColour();
+	
+}
+
+/**
+ * Logic loop.
+ * The function performs the following tasks:
+ *   - 
+ */
+void loop() {
+	
+	// Listen for a change in mode.
+	detectModeChange();
+	
+	// Detect which mode we are in.
+	switch (eClipMode)
+	{
+		// If we are in EEMODE_HEIGHTONLY mode, just use both LDRs for height.
+		case EEMODE_HEIGHTONLY:
+			loopHeightMode();
+			break;
+			
+		// If we are in EEMODE_SYNCPULSE mode, use the height and colour.
+		case EEMODE_SYNCPULSE:
+			loopSyncPulseMode();
+			break;
+		
+		// Unknown mode.. should not get here.
+		default:
+			break;
+	}
+
 }
 
 

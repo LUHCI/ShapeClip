@@ -17,7 +17,7 @@
 		</style>
 		
 		<!-- Shape Clip -->
-		<script type="text/javascript" src="ShapeClipAPI.js"></script>
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
 		
 		<!-- JQuery -->
 		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
@@ -32,25 +32,35 @@
 			
 			
 			var pads = [];
+			var hpads = [];
 			
 			function start() {
 				
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
-				var X = 50;
-				var Y = 50;
+				var X = 100;
+				var Y = 100;
 				
 				// Create a large pad grid.
 				for (var x = 0; x < 3; ++x)
 				{
 					for (var y = 0; y < 3; ++y)
 					{
-						var pX = X + (x * 25);
-						var pY = Y + (y * 25);
+						var pX = X + (x * 30);
+						var pY = Y + (y * 33);
 						var pad = new ShapeClipv1({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						
+						if (y == 2)
+							pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
-						pads.push(pad);
+						pad.rotate(180);
+						
+						if (y == 2)
+							hpads.push(pad);
+						else
+							pads.push(pad);
 					}
 				}
 				
@@ -61,6 +71,7 @@
 				document.getElementById("motorSlider").onchange = function(e){
 					var value = this.value * 0.01;
 					for (var i=0; i<pads.length; ++i) pads[i].height(value);
+					for (var i=0; i<hpads.length; ++i) hpads[i].height(value);
 				};
 				
 				// Configure the colour wheel.

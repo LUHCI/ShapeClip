@@ -70,6 +70,9 @@ function __px(mm) { return mm * 0.0393700787 * __ppi() }
  */
 var Pad = Class.extend({
 	
+	
+	CLIP_CORNER : true,		// Is the corner clipped off to help with orientation.
+	
 	/**
 	 * @brief Construct this pad.
 	 * @param settings The dictionary of arguments.
@@ -101,6 +104,13 @@ var Pad = Class.extend({
 		this._element.classList.add("sc_pad");
 		this._element.style.position = "fixed";
 		this._element.style["transform-origin"] = "50% 50%";
+		
+		if (this.CLIP_CORNER)
+		{
+			this._element.style["border-top-right-radius"] = "15px";
+			this._element.style["overflow"] = "hidden";
+		}
+		
 		parent.appendChild(this._element);
 		
 		// Configure the pad dimensions.
@@ -650,6 +660,122 @@ var ShapeClipv1 = Pad.extend({
 	heightmm : function(value) {
 		if (value !== undefined) { this._ldr2(value / this.TRAVEL_HEIGHT) }
 		return this._ldr2() * this.TRAVEL_HEIGHT;
+	},
+	
+});
+
+/**
+ * @brief The ShapeClipHeight is a Pad which supports single colour height drive, not colour.
+ */
+var ShapeClipHeight = Pad.extend({
+
+	// Device Constants.
+	TRAVEL_HEIGHT : 48.0,	// The number of mm that this ShapeClip unit can travel in mm.  (60mm screw length - 12mm flange height)
+	
+	/**
+	 * @brief Construct this ShapeClipv1.
+	 * @param settings The dictionary of arguments.
+	 *      settings.width  	- The total width of the pad (px).
+	 *      settings.height 	- The total height of the pad (px).
+	 *      settings.x   		- The horizontal centre position of the pad from the top-left of the screen (px).
+	 *      settings.y   		- The vertical centre position of the pad from the top-left of the screen (px).
+	 *      settings.angle   	- The rotation applied to this pad in degrees.  0 degrees is the top of the screen.
+	 *      settings.parent     - The parent element within which to add the pad.
+	 *      settings.mouserot   - Is mouse rotation on scroll enabled. Boolean, true by default.
+	 */
+	init : function(settings) {
+		
+		// Create the underlying pad.
+		this._super(settings);
+		
+		// Create an element for controlling LDR1
+		this._ldrElement = document.createElement("div");
+		this._ldrElement.classList.add("sc_control");
+		this._ldrElement.style.position = "absolute";
+		this._ldrElement.style.width  = "100%";
+		this._ldrElement.style.height = "100%";
+		this._ldrElement.style.top    = "0px";
+		this._ldrElement.style.left   = "0px";
+		this._ldrElement.style["background-color"] = "white";
+		this._ldrElement.style["pointer-events"] = "none";
+		this._element.appendChild(this._ldrElement);
+		
+		// LDR values.
+		this._ldr(0.0);
+	},
+	
+	/**
+	 * @brief Delete this pad.
+	 */
+	remove : function() { 
+		
+		// Stop the timer.
+		this.stopPulse(function(){
+			this._super();
+		});
+		
+		// Remove it from the DOM.
+		this._super();
+	},
+	
+	/**
+	 * @brief Set/Get the value of both LDRs as a 0-1 percentage.
+	 * @param percent The value the LDRs should transmit as a 0-1 percentage.
+	 * @return The percentage value of the LDRs, or if parameters are passed, the pad itself. 
+	 */
+	_ldr : function(percent) {
+		
+		// If data is given, set it.
+		if (percent !== undefined)
+		{
+			if (percent < 0) percent = 0;
+			if (percent > 1) percent = 1;
+			this._fLDR = (percent * 100.0);
+			this._ldrElement.style["background-color"] = "hsl(0,0%,"+this._fLDR+"%)";
+			return this;
+		}
+		
+		// Otherwise return the value.
+		return (this._fLDR * 0.01);
+	},
+	
+	/**
+	 * @brief Set/Get the value both LDRs as a 0-255 value.
+	 * @param percent The value the LDRs should transmit as a 0-255 value.
+	 * @return The byte value of the LDRs, or if parameters are passed, the pad itself. 
+	 */
+	_ldrb : function(byte) {
+		if (byte !== undefined) { this._ldr(byte / 255.0); return this; }
+		return parseInt(this._ldr() * 255);
+	},
+	
+	/**
+	 * @brief Set/Get the height value this pad should transmit as a percentage.
+	 * @param value The height (as a 0-1 percentage) for the device. 0 is lowest. 1 is highest.
+	 * @return The height value as a 0-1 percentage, or if parameters are passed, the pad itself.
+	 */
+	height : function(value) {
+		if (value !== undefined) { this._ldr(value); }
+		return this._ldr();
+	},
+	
+	/**
+	 * @brief Set/Get the height value this pad should transmit as mm.
+	 * The precision of this value is probably not completely accurate.  Based on TRAVEL_HEIGHT constant.
+	 * @param value The height (mm) for the device. 0 is lowest. TRAVEL_HEIGHT is highest.
+	 * @return The height value (mm) between 0 and TRAVEL_HEIGHT, or if parameters are passed, the pad itself.
+	 */
+	heightmm : function(value) {
+		if (value !== undefined) { this._ldr(value / this.TRAVEL_HEIGHT) }
+		return this._ldr() * this.TRAVEL_HEIGHT;
+	},
+	
+	/**
+	 * @brief Quickly show the LDRs the entire colour range they can produce.
+	 * This can be helpful if the internal clip calibration gets out of whack.
+	 */
+	showRange: function(value) {
+		
 	},
 	
 });
