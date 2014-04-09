@@ -70,6 +70,16 @@ class WindowVariance
 		}
 		
 		/**
+		 * @brief Add a given amount to all the items.
+		 * This can be used to tend up or down with samples.
+		 */
+		void inflate(float fAmount) const
+		{
+			for (int i = 0; i < iWindowCount; ++i)
+				tItems[i] += fAmount;
+		}
+		
+		/**
 		 * @brief Return the number of items in the window.
 		 * @return A positive integer with the number of items in the window.
 		 */

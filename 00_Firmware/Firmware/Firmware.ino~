@@ -76,6 +76,10 @@ const int SAMPLE_WINDOW = 90;								// The amount of time (ms) to sample the LD
 //#define SERIAL_SYNC_DEBUG		// Should sync pulse debug data be streamed via serial? csv: ms, r, g, b
 //#define SERIAL_SYNC_DEBUG2	// Should the verbose sync pulse debug data be streamed via serial? csv: ms, slope, max, r, g, b, min, raw
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 #define RGBMODE_NONE     0		// The RGB LED displays nothing.
 #define RGBMODE_SCREEN   1		// The RGB LED displays the last colour the pulses detected.
 #define RGBMODE_NOSCREEN 2		// The RGB LED displays the "not on screen" pattern (i.e. no pulse detected).
@@ -148,6 +152,19 @@ Adafruit_NeoPixel pRGB = Adafruit_NeoPixel(1, PIN_RGB_OUT, NEO_GRB + NEO_KHZ800)
 boolean bMotorCalibrated = false;	// Is the motor position value accurate?
 int iMotorPosition = 0;				// The current number of steps in the motor.
 
+<<<<<<< HEAD
+int eRGBMode = RGBMODE_NONE;		// Current RGB mode.
+bool bOnScreen = false;				// Is the shape clip device on the screen (i.e. does it have a valid sync pulse)?
+bool bLastOnScreen = false;			// As above, 1 state change behind.
+
+int iTargetR = 0;					// Target RED component.
+int iTargetG = 0;					// Target GREEN component.
+int iTargetB = 0;					// Target BLUE component.
+int iTargetPos = 0;					// Target MOTOR height (steps).
+
+int iLDR1Min = 0;					// Current estimated LDR minimum.
+int iLDR1Max = 0;					// Current estimated LDR maximum.
+=======
 int eClipMode = EEMODE_SYNCPULSE;
 int eRGBMode = RGBMODE_NONE;		// Current RGB mode.
 bool bOnScreen = false;				// Is the shape clip device on the screen (i.e. does it have a valid sync pulse)?
@@ -163,6 +180,7 @@ int iLDR1Max = 0;					// Current estimated LDR maximum.
 
 //int iLDR2Min = 0;					// Current estimated LDR minimum.
 //int iLDR2Max = 0;					// Current estimated LDR maximum.
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 
 LDR ldr1(PIN_LDR1);
 LDR ldr2(PIN_LDR2);
@@ -241,7 +259,11 @@ void zeroMotor() {
 	// Until the motor is calibrated, step down each time.
 	for(int iAvailableSteps = MOTOR_TRAVEL; iAvailableSteps >= 0; iAvailableSteps--) {
 		motor.step(-1);
+<<<<<<< HEAD
 
+=======
+		
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 		#ifdef SWBOT_MOTOR
 		if (digitalRead(PIN_SWBOT) == LOW) break;
 		#endif
@@ -265,84 +287,112 @@ void zeroMotor() {
  * It will update the iTargetR,G,B, iLDR1Max and iLDR1Min values if valid pulses are detected.
  * @return -1 if check not performed, 1 if we received an active pulse, 0 if we did not.
  */
-WindowVariance * runningVariance = new WindowVariance( 20 );
 int8_t checkPulse() {
-
-  // Only allow this function to be called once every 5ms.
-  static unsigned long tmr1 = 0;
-  if (!cycleCheck(&tmr1, 2U))
-    return PULSE_STATE__NOT_CHECKED;
-
-  int iLDRValue[] = { analogRead( PIN_LDR1 ), analogRead( PIN_LDR2 ) };
-  int iInVal = iLDRValue[0] - iLDRValue[1];
-  runningVariance->push( iInVal );
-
-  //iInVal = constrain( (int)runningVariance->mean(), -512, 512 ) + 512;
-  int variance = runningVariance->variance();
-
-  int state = map( iInVal, 150, 600, 0, 255 );
-
-  //Serial.print( variance, DEC );
-  //Serial.print( "\t" );
-  //Serial.println( iInVal, DEC );
-  
-  if( variance > 15 )
-  {
-
-    
-    Serial.print( variance );
-    Serial.print( "\t" );
-    iInVal = map( iInVal, 50, 700, 0, 255 );
-    Serial.print( iInVal, DEC );
-    
-    if( iInVal < 100 )
-      Serial.println( "    <--- START" );
-    else
-      Serial.println( "" );
-    
-    iTargetPos = constrain(iInVal*2, 0, MOTOR_TRAVEL);
-    
-    /*Serial.print( packet->seq, DEC );
-    Serial.print( "\t" );
-    Serial.print( packet->r, DEC );
-    Serial.print( "\t" );
-    Serial.print( packet->g, DEC );
-    Serial.print( "\t" );
-    Serial.println( packet->b, DEC );*/
-
-    /*Serial.print( variance, DEC );
-    Serial.print( "\t" );
-    Serial.print( state, BIN );
-    Serial.print( "\t" );
-    Serial.print( state, HEX );
-    Serial.print( "\t" );
-    Serial.print( iInVal, HEX );
-    Serial.print( "\t" );
-    Serial.println( iLDRValue[0], DEC );*/
-  }
-
-  // Debug graph. Used with SerialChart.
-#ifdef SERIAL_SYNC_DEBUG
-  Serial.print(millis()); Serial.print(","); 		// ms
-  Serial.print(iTargetR); Serial.print(","); 		// Red
-  Serial.print(iTargetG); Serial.print(","); 		// Green
-  Serial.print(iTargetB); Serial.print("\n"); 	// Blue
-#endif
-
-#ifdef SERIAL_SYNC_DEBUG2
-  // Print out the verbose serial debug as csv.
-  Serial.print(millis()); Serial.print(","); 		// ms
-  Serial.print(fSlope); Serial.print(","); 		// slope
-  Serial.print(iLDR1Max); Serial.print(","); 		// Estimated maximum (white + backlight).
-  Serial.print(r); Serial.print(","); 			// Red (estimated)
-  Serial.print(g); Serial.print(","); 			// Green (estimated)
-  Serial.print(b); Serial.print(","); 			// Blue (estimated)
-  Serial.print(iLDR1Min); Serial.print(","); 		// Estimated minimum (black + backlight).
-  Serial.println(iLDRValue);						// ldr raw
-#endif
-
-  // Assume we're always active, for now.
-  return PULSE_STATE__ACTIVE_PULSE;
+	
+	// Only allow this function to be called once every 5ms.
+	static unsigned long tmr1 = 0;
+	if (!cycleCheck(&tmr1, 5U))
+		return PULSE_STATE__NOT_CHECKED;
+	
+	// Define static variables.
+	static WindowVariance* pEstimatedMin = new WindowVariance(5);	// Running 
+	static WindowVariance* pEstimatedMax = new WindowVariance(5);
+	static int r=0; static int g=0; static int b=0;
+	static float x1,x2,y1,y2 = 0;	// Required for slope differentials.
+	static float fSlope = 0.0f;		// Required for slope differentials.
+	static long iLastMinima = 0;	// The time of the last minimal (ms).
+	
+	// Read the LDR and reset the serial debug colour values.
+	int iLDRValue = analogRead(PIN_LDR1);
+	r=0; g=0; b=0;
+	
+	// Compute the slope (dLDR/dTime) by comparing it to the previous data.
+	long iCurrentTime = millis();
+	x1 = x2; y1 = y2;
+	x2 = (float)iCurrentTime; y2 = (float)iLDRValue;
+	fSlope = (y1-y2) / (x1-x2);
+	
+	// If we are hitting a big dip AND it has been over 50ms since the last one.
+	int iDeltaTime = iCurrentTime - iLastMinima;
+	boolean bSlopeDetected = fSlope < -SYNC_SIGNAL_DROP_THRESHOLD;
+	boolean bWithinPulseRange = iDeltaTime > (DATA_WIDTH - DATA_WIDTH_ERR); // &&  delta < (DATA_WIDTH + DATA_WIDTH_ERR + PULSE_WIDTH + PULSE_WIDTH_ERR);
+	
+	// TODO: Reject pulses after a recent slope detection.
+	if (bSlopeDetected && bWithinPulseRange)
+	{
+		// Log the start of the second pulse of the data-frame.
+		iLastMinima = iCurrentTime;
+		
+		// If another minma happened BEFORE 500ms  (i.e. the amount of time between a high and a red/green)
+		//  then we know that it is likely attached to the wrong pulse.
+	}
+	
+	// Determine if this device has a sync pulse.
+	boolean bActive = iDeltaTime < ( DATA_WIDTH + DATA_WIDTH_ERR ) ;
+	
+	// If an active sync pulse, sample the data.
+	if (bActive)
+	{
+		// Make it relative to the start of the minima spike.
+		int iRelativeDelta = iCurrentTime - iLastMinima;
+		
+		// Sample the min and max.  Min = immediately after the spike, Max = 4th pulse after the spike.
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 0) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Min.
+			pEstimatedMin->push(iLDRValue);
+			iLDR1Min = pEstimatedMin->mean();
+			ldr2.updateMin(iLDR1Min);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 4) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Max.
+			pEstimatedMax->push(iLDRValue);
+			iLDR1Max = pEstimatedMax->mean();
+			ldr2.updateMax(iLDR1Max);
+		}
+		
+		// Sample the RGB pulses. R = 1st pulse after the spike, B = 3rd pulse after the spike.
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 1) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Red.
+			r = iLDRValue;
+			iTargetR = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 2) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Green.
+			g = iLDRValue;
+			iTargetG = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 3) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Blue.
+			b = iLDRValue;
+			iTargetB = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+		
+		// Ensure we are in a mode that displays a screen colour.
+		//changeMode(SCREEN);
+	}
+	else
+	{
+		// Turn the LED blue (not on screen).
+		//changeMode(NO_SCREEN);
+	}
+	
+	// Debug graph. Used with SerialChart. 
+	#ifdef SERIAL_SYNC_DEBUG
+	Serial.print(millis()); Serial.print(","); 		// ms
+	Serial.print(iTargetR); Serial.print(","); 		// Red
+	Serial.print(iTargetG); Serial.print(","); 		// Green
+	Serial.print(iTargetB); Serial.print("\n"); 	// Blue
+	#endif
+	
+	#ifdef SERIAL_SYNC_DEBUG2
+	// Print out the verbose serial debug as csv.
+	Serial.print(millis()); Serial.print(","); 		// ms
+	Serial.print(fSlope); Serial.print(","); 		// slope
+	Serial.print(iLDR1Max); Serial.print(","); 		// Estimated maximum (white + backlight).
+	Serial.print(r); Serial.print(","); 			// Red (estimated)
+	Serial.print(g); Serial.print(","); 			// Green (estimated) 
+	Serial.print(b); Serial.print(","); 			// Blue (estimated)
+	Serial.print(iLDR1Min); Serial.print(","); 		// Estimated minimum (black + backlight).
+	Serial.println(iLDRValue);						// ldr raw
+	#endif
+	
+	// Return if we are active or not.
+	return bActive ? PULSE_STATE__ACTIVE_PULSE : PULSE_STATE__NO_PULSE;
 }
 
 /**
@@ -370,8 +420,13 @@ void moveMotor() {
 	// Compute the distance to travel.
 	int iDelta = iTargetPos - iMotorPosition;
 	
+<<<<<<< HEAD
+	// If we have to move over 20 steps in either direction.
+	if (abs(iDelta) > 20)
+=======
 	// If we have to move over 1 step in either direction.
 	if (abs(iDelta) > 1)
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 	{
 		// Move one step in the correct direction and update the motor position.
 		int step = iDelta >= 0 ? 1 : -1;
@@ -400,17 +455,37 @@ void updateColour() {
 			break;
 		case RGBMODE_SCREEN:
 			{
+<<<<<<< HEAD
+				// Get the current colour.
+=======
 				// Go immediately to the new colour.
 				// pRGB.setPixelColor(0,  iTargetR, iTargetG, iTargetB);
 				
 				// Get 1% closer to the target colour each iteration.
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 				uint32_t currentColor = pRGB.getPixelColor(0);
 				int stepRed   = constrain(map(10, 0, 1000, RED(currentColor),   iTargetR), 0, iTargetR);
 				int stepGreen = constrain(map(10, 0, 1000, GREEN(currentColor), iTargetG), 0, iTargetG);
 				int stepBlue  = constrain(map(10, 0, 1000, BLUE(currentColor),  iTargetB), 0, iTargetB);
 				
+<<<<<<< HEAD
+				// If this does not match the target colour, blend it.
+				if(currentColor != RGB(iTargetR, iTargetG, iTargetB))
+				{
+					// Get 1% closer each iteration.
+					int stepRed   = constrain(map(1, 0, 100, RED(currentColor), iTargetR), 0, iTargetR);
+					int stepGreen = constrain(map(1, 0, 100, RED(currentColor), iTargetG), 0, iTargetG);
+					int stepBlue  = constrain(map(1, 0, 100, RED(currentColor), iTargetB), 0, iTargetB);
+					
+					// Set the step value.
+					pRGB.setPixelColor(0,  stepRed, stepGreen, stepBlue);
+				}
+				
+				// pRGB.setPixelColor(0,  iTargetR, iTargetG, iTargetB);
+=======
 				// Set the step value.
 				pRGB.setPixelColor(0,  stepRed, stepGreen, stepBlue);
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 			}
 			break;
 		case RGBMODE_NOSCREEN:
@@ -445,6 +520,8 @@ void setup() {
 	// Wait two seconds.
 	Serial.println("hello world");
 	
+<<<<<<< HEAD
+=======
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
 	if (eClipMode != EEMODE_SYNCPULSE && eClipMode != EEMODE_HEIGHTONLY)
@@ -453,6 +530,7 @@ void setup() {
 		eClipMode = EEMODE_HEIGHTONLY;
 	}
 	
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 	// Wait for a random time so that not all clips zero their motor at the same time.
 	randomSeed(analogRead(PIN_RND));
 	uint16_t randomWait = random(1000);
@@ -604,6 +682,8 @@ void loopSyncPulseMode() {
 	if (cycleCheck(&tmrSerial, 500U))
 		debugSerial();
 	#endif
+<<<<<<< HEAD
+=======
 }
 
 
@@ -702,6 +782,8 @@ void loop() {
 		default:
 			break;
 	}
+
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055
 }
 
 

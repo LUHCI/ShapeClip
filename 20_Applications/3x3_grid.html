@@ -32,26 +32,44 @@
 			
 			
 			var pads = [];
+			var hpads = [];
 			
 			function start() {
 				
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
-				var X = 50;
-				var Y = 50;
+				var X = 100;
+				var Y = 100;
 				
 				// Create a large pad grid.
 				for (var x = 0; x < 3; ++x)
 				{
 					for (var y = 0; y < 3; ++y)
 					{
+<<<<<<< HEAD:20_Applications/3x3_grid.html
 						var pX = 100 + (x * 27); // 29
 						var pY = 100 + (y * 34); // 33
+=======
+						var pX = X + (x * 30);
+						var pY = Y + (y * 33);
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055:20_Applications/3x3_grid.html
 						var pad = new ShapeClipv1({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						
+						if (y == 2)
+							pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
 						pad.rotate(180);
+<<<<<<< HEAD:20_Applications/3x3_grid.html
 						pads.push(pad);
+=======
+						
+						if (y == 2)
+							hpads.push(pad);
+						else
+							pads.push(pad);
+>>>>>>> be8a116c20b06c0109ba399d967fc1f49f3c7055:20_Applications/3x3_grid.html
 					}
 				}
 				
@@ -62,6 +80,7 @@
 				document.getElementById("motorSlider").onchange = function(e){
 					var value = this.value * 0.01;
 					for (var i=0; i<pads.length; ++i) pads[i].height(value);
+					for (var i=0; i<hpads.length; ++i) hpads[i].height(value);
 				};
 				
 				// Configure the colour wheel.
