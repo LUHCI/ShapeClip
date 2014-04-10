@@ -1,0 +1,14 @@
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\obj\x86\Debug\WSSerial.csprojResolveAssemblyReference.cache
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\bin\Debug\WSSerial.exe.config
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\bin\Debug\WSSerial.exe
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\bin\Debug\WSSerial.pdb
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\bin\Debug\Alchemy.dll
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\obj\x86\Debug\WSSerial.exe
+C:\Users\John\Desktop\UD Live\displays\websocketsample\server\WSSerial\WSSerial\obj\x86\Debug\WSSerial.pdb
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Debug\WSSerial.exe.config
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\obj\x86\Debug\WSSerial.exe
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\obj\x86\Debug\WSSerial.pdb
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Debug\WSSerial.exe
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Debug\WSSerial.pdb
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Debug\Alchemy.dll
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\obj\x86\Debug\WSSerial.csprojResolveAssemblyReference.cache

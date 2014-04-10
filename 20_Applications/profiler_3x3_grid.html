@@ -17,7 +17,7 @@
 		</style>
 		
 		<!-- Shape Clip -->
-		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI2.js"></script>
 		
 		<!-- JQuery -->
 		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
@@ -30,9 +30,9 @@
 		
 		<script type="text/javascript">
 			
+			var ws;
 			
 			var pads = [];
-			var hpads = [];
 			
 			function start() {
 				
@@ -51,19 +51,12 @@
 						
 						var pad = null;
 						
-						if (y == 2)
-							pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
-						else
-							pad = new ShapeClipv1({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
-						
+						pad = new ShapeClipFastComms({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
 						pad.rotate(180);
 						
-						if (y == 2)
-							hpads.push(pad);
-						else
-							pads.push(pad);
+						pads.push(pad);
 					}
 				}
 				
@@ -74,7 +67,6 @@
 				document.getElementById("motorSlider").onchange = function(e){
 					var value = this.value * 0.01;
 					for (var i=0; i<pads.length; ++i) pads[i].height(value);
-					for (var i=0; i<hpads.length; ++i) hpads[i].height(value);
 				};
 				
 				// Configure the colour wheel.
@@ -87,7 +79,18 @@
 				});
 				
 				
+				// Open a serial websocket to the ShapeClip.
+				ws = new WebSocket("ws://localhost:81/COM7/115200");
+				ws.onopen    = function() { console.log("OPEN"); };
+				ws.onclose   = function() { console.log("CLOSED"); };
+				ws.onmessage = function(e) {
+					console.log(e.data);
+				};
+				
+				
 			};
+			
+			
 			
 			
 		</script>

@@ -1,0 +1,6 @@
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Release\WSSerial.exe.config
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Release\WSSerial.exe
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Release\WSSerial.pdb
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\bin\Release\Alchemy.dll
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\obj\x86\Release\WSSerial.exe
+C:\Users\John\Documents\GitHub\ShapeClip\10_Driver\wsserial\WSSerial\obj\x86\Release\WSSerial.pdb

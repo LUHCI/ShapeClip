@@ -19,8 +19,9 @@
 /* Which version of the device are we compiling for. */
 //#define DEVICE_MKI
 #define DEVICE_MKIII
-//#define SWBOT_MOTOR		// Use SWBOT as a motor stop?
-#define SWBOT_HEIGHT		// Use SWBOT as a height-only LDR read mode.
+
+#define MODE_PROFILING 		// Is the clip profiling itself via serial.
+
 
 /* External and 3rd party libraries. */ 
 #include <Math.h>
@@ -83,9 +84,9 @@ const int SAMPLE_WINDOW = 90;								// The amount of time (ms) to sample the LD
 
 #define EEMODEADDR 0			// The address of the mode stored in EEPROM.
 #define EEMODE_CHANGETIME 5000  // The number of ms to hold the switch before the clip mode is changed.
-#define EEMODE_SYNCPULSE  45		// The Clip looks for a sync pulse on one of the LDRs.
+#define EEMODE_SYNCPULSE  45	// The Clip looks for a sync pulse on one of the LDRs.
 #define EEMODE_HEIGHTONLY 37	// The Clip uses both LDRs to estimate height, no colour involved.
-#define EEMODE_SERIAL     89
+#define EEMODE_SERIAL     89	// The Clip can send / recieve serial data with a simple protocol.
 
 #define PULSE_STATE__NOT_CHECKED  -1	// The sync-pulse routine did not bother checking, too soon since previous check.
 #define PULSE_STATE__NO_PULSE      0	// The sync-pulse check returned no pulse.. Probably off a screen.
@@ -214,11 +215,11 @@ void debugSerial() {
 	// Write out values.
 	Serial.print(millis()); Serial.print(","); 									// ms
 	Serial.print(analogRead(PIN_LDR1)); Serial.print(","); 						// ldr1
-	Serial.print(ldr2.sample()); Serial.print(","); 						// ldr2
-	Serial.print(RGB(iTargetR, iTargetG, iTargetB), HEX); Serial.print(" "); 		// RGB
-	Serial.print(pRGB.getPixelColor(0), HEX); Serial.print(","); 		// RGB
+	Serial.print(ldr2.sample()); Serial.print(","); 							// ldr2
+	Serial.print(RGB(iTargetR, iTargetG, iTargetB), HEX); Serial.print(" "); 	// RGB
+	Serial.print(pRGB.getPixelColor(0), HEX); Serial.print(","); 				// RGB
 
-	Serial.print(iTargetPos); Serial.print(","); 								// height
+	Serial.print(iMotorPosition); Serial.print(","); 							// current height
 	//Serial.print(analogRead(PIN_FORCE)); Serial.print(","); 					// force
 	Serial.print(iTargetPos); Serial.print(","); 								// target height
 	Serial.print(bOnScreen ? "Y" : "N"); Serial.print(","); 					// has sync pulse
@@ -243,9 +244,9 @@ void zeroMotor() {
 	for(int iAvailableSteps = MOTOR_TRAVEL; iAvailableSteps >= 0; iAvailableSteps--) {
 		motor.step(-1);
 
-		#ifdef SWBOT_MOTOR
-		if (digitalRead(PIN_SWBOT) == LOW) break;
-		#endif
+		//#ifdef SWBOT_MOTOR
+		//if (digitalRead(PIN_SWBOT) == LOW) break;
+		//#endif
 	}
 	
 	// Set the motor position to 0 (known location).
@@ -358,7 +359,7 @@ void setup() {
 	Serial.begin(115200);
 	
 	// Wait two seconds.
-	Serial.println("Boot v2.0");
+	Serial.println("Boot v2.1");
 	
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
@@ -460,7 +461,16 @@ void detectModeChange() {
           pRGB.show();
           delay( 100 );
         }
-        
+		
+		// If we are in profiling mode, clear all target values on mode switch.
+		#ifdef MODE_PROFILING
+		iTargetR = 0;
+		iTargetG = 0;
+		iTargetB = 0;
+		iTargetPos = 0;
+		#endif
+		
+		// Store to EEPROM.
         EEPROM.write( EEMODEADDR, eClipMode );
 }
 
@@ -584,35 +594,6 @@ int8_t checkPulse() {
  * as appropriate.
  */
 void loopSyncPulseMode() {
-	
-	// If we are built with the option of SWBOT
-	//  as a height only mode jumper.
-	#ifdef SWBOT_HEIGHT
-	// If SWBOT is pressed.
-	if (digitalRead(PIN_SWBOT) == LOW)
-	{
-		// Sample height from both.
-		// Make relative to min and max.
-		// Set target height.
-		// Move motor.
-	}
-	else
-	#endif
-	{
-		// Check for sync-pulse on both LDRs.
-		
-		// If none are found, off screen.
-		// If two are found, bad rotation.
-		
-		// If only one is found, active and ready.
-		//	 sample, rgbh
-		//   update colours
-		//   update motor
-		
-	}
-	
-	
-	
 	
 	// Sync with the RGB pulse.
 	int8_t ePulseState = checkPulse();
@@ -844,15 +825,64 @@ void loop() {
 		case EEMODE_SYNCPULSE:
 			loopSyncPulseMode();
 			break;
-
+			
+		// If we are in EEMODE_SERIAL, use the simple binary protocol.
 		case EEMODE_SERIAL:
-                        loopSerialMode();
-                        break;
-
+			loopSerialMode();
+			break;
+			
 		// Unknown mode.. should not get here.
 		default:
 			break;
 	}
+	
+	// If we are in profiling mode.
+	#ifdef MODE_PROFILING
+	
+	static bool bMeasuring = false;
+	static unsigned int iMeasureCount = 0;
+	
+	// Process new commands.
+	if (Serial.available())
+	{
+		byte data = Serial.read();
+		switch (data)
+		{
+			case 'p':
+				Serial.println("pong");
+				break;
+			case 's':
+				Serial.print("start "); 
+				Serial.println(iMeasureCount);
+				bMeasuring = true;
+				break;
+			case 'f':
+				Serial.print("stop ");
+				Serial.println(iMeasureCount);
+				bMeasuring = false;
+				iMeasureCount ++;
+				break;
+		}
+	}
+	
+	// Print out if measuring.
+	if (bMeasuring)
+	{
+		static unsigned long tmrSample = 0;
+		if (cycleCheck(&tmrSample, 50U))
+		{
+			Serial.print(iMotorPosition); Serial.print(","); 	// Current MOTOR HEIGHT.
+			Serial.print(iTargetPos); Serial.print(","); 		// Target MOTOR HEIGHT.
+			Serial.print(iTargetR); Serial.print(","); 			// Target RED
+			Serial.print(iTargetG); Serial.print(","); 			// Target GREEN
+			Serial.print(iTargetB); Serial.print("\n"); 		// Target BLUE.
+			
+			//#define HRGB(h,r,g,b) 	(((h & 0xFF) << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8)  | ((b & 0xFF) << 0))
+			//Serial.println(HRGB(iTargetPos, iTargetR, iTargetG, iTargetB), HEX); // Target HRGB.
+		}
+	}
+	#endif
+	
 }
 
 

@@ -288,10 +288,14 @@ var Pad = Class.extend({
 });
 
 
+var EP = 1;
+var OP = 0;
+var FRAME = 0;
+
 /**
  * @brief The ShapeClipv1 is a Pad which can move the ShapeClip v1 up and down.
  */
-var ShapeClipv1 = Pad.extend({
+var ShapeClipFastComms = Pad.extend({
 
 	// Signal Constants.
 	HIGH_IDX 	: 0,		// The index into the _signals array for the HIGH pulse.  This should always be 255 at index 0.
@@ -350,6 +354,11 @@ var ShapeClipv1 = Pad.extend({
 		this._ldr1(0.0);
 		this._ldr2(0.0);
 		
+		this._fRed    = 0;
+		this._fGreen  = 0;
+		this._fBlue   = 0;
+		this._fHeight = 0;
+		
 		// RGB Signal Pattern.
 		//this._signals = [5, 0, 0, 0, 10, 0, 0, 0];
 		//this._signals = [255, 255, 255, 0, 0, 0, 0];
@@ -366,9 +375,7 @@ var ShapeClipv1 = Pad.extend({
 				
 		//this._signals = [ 255, 64, 32, 64, 128, 64, 255 ];
 		
-		var EP = 1;
-		var OP = 0;
-		var FRAME = 0;
+
 		
 		this._signals = [];
 		var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
@@ -411,7 +418,11 @@ var ShapeClipv1 = Pad.extend({
 				this._signals.push( 0 );
 		}
 		
-		
+		// Use the packer.
+		//var a = this._packBytes([0,0,0,0, 1,1,1,1]);
+		//var b = this._packBytes([1,1,1,1, 0,0,0,0]);
+		//var c = this._pack(0x88);
+		//this._signals = a.concat(b).concat(c);
 		
 		// Pulsing values.
 		this._bStopPulse = false;
@@ -422,6 +433,52 @@ var ShapeClipv1 = Pad.extend({
 		if (settings.pulse || false)
 			this.pulse();
 	},
+	
+	_pack : function ( value ) {
+		return this._packBytes( this._bytes( value ) );
+	},
+	
+	_packBytes : function( bytes ) {
+		
+		var packedframe = [];
+		var parity = false;
+		
+		FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+		
+		packedframe.push(FRAME)	// Frame Start
+		packedframe.push(1)		// Start Bit
+		
+		// Pack data.
+		for( var i=0; i<bytes.length; i++ )
+		{
+			packedframe.push( 128 );
+			if( bytes[i] == 1 )
+			{
+				packedframe.push( 255 );
+				parity = !parity;
+			}
+			else
+			{
+				packedframe.push( 0 );
+			}
+		}
+		
+		packedframe.push( parity ? EP : OP )		// Party Bit
+		
+		return packedframe;
+	},
+	
+	_bytes : function( value ) {
+		var sbits = parseInt(value).toString(2);
+		if (sbits.length > 8) throw "too many bits";
+		if (sbits[0] == "-") throw "no negative values"
+		var len = sbits.length - 1;
+		function b(i) { return (sbits[len-i] == "1") ? 1 : 0; }
+		return [ b(7),b(6),b(5),b(4), b(3),b(2),b(1),b(0)  ];
+	},
+	
+	
+	
 	
 	/**
 	 * @brief Delete this pad.
@@ -504,8 +561,12 @@ var ShapeClipv1 = Pad.extend({
 	 * @return The value in the red channel, or if parameters are passed, the pad itself.
 	 */
 	r : function(value) {
-		if (value !== undefined) { this._signals[this.RED_IDX] = value; return this; }
-		return parseInt(this._signals[this.RED_IDX]);
+		if (value !== undefined)
+		{ 
+			this._fRed = value / 255.0;
+			return this;
+		}
+		return parseInt(this._fRed * 255);
 	},
 	/**
 	 * @brief Set/Get the red channel.
@@ -513,8 +574,12 @@ var ShapeClipv1 = Pad.extend({
 	 * @return The value in the red channel, or if parameters are passed, the pad itself.
 	 */
 	g : function(value) {
-		if (value !== undefined) { this._signals[this.GREEN_IDX] = value; return this; }
-		return parseInt(this._signals[this.GREEN_IDX]);
+		if (value !== undefined)
+		{ 
+			this._fGreen = value / 255.0;
+			return this;
+		}
+		return parseInt(this._fGreen * 255);
 	},
 	/**
 	 * @brief Set/Get the red channel.
@@ -522,8 +587,12 @@ var ShapeClipv1 = Pad.extend({
 	 * @return The value in the red channel, or if parameters are passed, the pad itself.
 	 */
 	b : function(value) {
-		if (value !== undefined) { this._signals[this.BLUE_IDX] = value; return this; }
-		return parseInt(this._signals[this.BLUE_IDX]);
+		if (value !== undefined)
+		{ 
+			this._fBlue = value / 255.0;
+			return this;
+		}
+		return parseInt(this._fBlue * 255);
 	},
 	
 	/**
@@ -569,9 +638,9 @@ var ShapeClipv1 = Pad.extend({
 			else if (kValue['R'] !== undefined && kValue['G'] !== undefined && kValue['B'] !== undefined) { r = kValue['R']; g = kValue['G']; b = kValue['B']	}
 			
 			// Load them into the signals table.
-			this._signals[this.RED_IDX]   = r;
-			this._signals[this.GREEN_IDX] = g;
-			this._signals[this.BLUE_IDX]  = b;
+			this.r(r);
+			this.g(g);
+			this.b(b);
 			
 			// Return the pad.
 			return this;
@@ -580,13 +649,10 @@ var ShapeClipv1 = Pad.extend({
 		// If there are three arguments, treat them as RGB.
 		else if (arguments.length == 3)
 		{
-			// Treat as floats or ints.
-			var bFloat = false;
-			
 			// Load them into the signals table.
-			this._signals[this.RED_IDX]   = bFloat ? parseFloat(arguments[0]) : parseInt(arguments[0]);
-			this._signals[this.GREEN_IDX] = bFloat ? parseFloat(arguments[1]) : parseInt(arguments[1]);
-			this._signals[this.BLUE_IDX]  = bFloat ? parseFloat(arguments[2]) : parseInt(arguments[2]);
+			this.r(parseInt(arguments[0]));
+			this.g(parseInt(arguments[1]));
+			this.b(parseInt(arguments[2]));
 			
 			// Return the pad.
 			return this;
@@ -717,12 +783,12 @@ var ShapeClipv1 = Pad.extend({
 	 * @return The height value as a 0-1 percentage, or if parameters are passed, the pad itself.
 	 */
 	height : function(value) {
-		//if (value !== undefined) { this._ldr2(value); }
-		//return this._ldr2();
-	},
-	
-	heightjv : function(value) {
-		this._signals[0] = value*128;
+		if (value !== undefined)
+		{ 
+			this._fHeight = value;
+			return this;
+		}
+		return parseInt(this._fHeight);
 	},
 	
 	/**
@@ -732,8 +798,8 @@ var ShapeClipv1 = Pad.extend({
 	 * @return The height value (mm) between 0 and TRAVEL_HEIGHT, or if parameters are passed, the pad itself.
 	 */
 	heightmm : function(value) {
-		//if (value !== undefined) { this._ldr2(value / this.TRAVEL_HEIGHT) }
-		//return this._ldr2() * this.TRAVEL_HEIGHT;
+		if (value !== undefined) { this.height(value / this.TRAVEL_HEIGHT) }
+		return this.height() * this.TRAVEL_HEIGHT;
 	},
 	
 });
