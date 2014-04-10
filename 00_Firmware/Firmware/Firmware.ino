@@ -83,8 +83,9 @@ const int SAMPLE_WINDOW = 90;								// The amount of time (ms) to sample the LD
 
 #define EEMODEADDR 0			// The address of the mode stored in EEPROM.
 #define EEMODE_CHANGETIME 5000  // The number of ms to hold the switch before the clip mode is changed.
-#define EEMODE_SYNCPULSE 45		// The Clip looks for a sync pulse on one of the LDRs.
+#define EEMODE_SYNCPULSE  45		// The Clip looks for a sync pulse on one of the LDRs.
 #define EEMODE_HEIGHTONLY 37	// The Clip uses both LDRs to estimate height, no colour involved.
+#define EEMODE_SERIAL     89
 
 #define PULSE_STATE__NOT_CHECKED  -1	// The sync-pulse routine did not bother checking, too soon since previous check.
 #define PULSE_STATE__NO_PULSE      0	// The sync-pulse check returned no pulse.. Probably off a screen.
@@ -260,92 +261,6 @@ void zeroMotor() {
 }
 
 /**
- * @brief Check the sync pulse and update relevant global variables.
- * This is automatically rate limited to 5ms samples.
- * It will update the iTargetR,G,B, iLDR1Max and iLDR1Min values if valid pulses are detected.
- * @return -1 if check not performed, 1 if we received an active pulse, 0 if we did not.
- */
-WindowVariance * runningVariance = new WindowVariance( 20 );
-int8_t checkPulse() {
-
-  // Only allow this function to be called once every 5ms.
-  static unsigned long tmr1 = 0;
-  if (!cycleCheck(&tmr1, 2U))
-    return PULSE_STATE__NOT_CHECKED;
-
-  int iLDRValue[] = { analogRead( PIN_LDR1 ), analogRead( PIN_LDR2 ) };
-  int iInVal = iLDRValue[0] - iLDRValue[1];
-  runningVariance->push( iInVal );
-
-  //iInVal = constrain( (int)runningVariance->mean(), -512, 512 ) + 512;
-  int variance = runningVariance->variance();
-
-  int state = map( iInVal, 150, 600, 0, 255 );
-
-  //Serial.print( variance, DEC );
-  //Serial.print( "\t" );
-  //Serial.println( iInVal, DEC );
-  
-  if( variance > 15 )
-  {
-
-    
-    Serial.print( variance );
-    Serial.print( "\t" );
-    iInVal = map( iInVal, 50, 700, 0, 255 );
-    Serial.print( iInVal, DEC );
-    
-    if( iInVal < 100 )
-      Serial.println( "    <--- START" );
-    else
-      Serial.println( "" );
-    
-    iTargetPos = constrain(iInVal*2, 0, MOTOR_TRAVEL);
-    
-    /*Serial.print( packet->seq, DEC );
-    Serial.print( "\t" );
-    Serial.print( packet->r, DEC );
-    Serial.print( "\t" );
-    Serial.print( packet->g, DEC );
-    Serial.print( "\t" );
-    Serial.println( packet->b, DEC );*/
-
-    /*Serial.print( variance, DEC );
-    Serial.print( "\t" );
-    Serial.print( state, BIN );
-    Serial.print( "\t" );
-    Serial.print( state, HEX );
-    Serial.print( "\t" );
-    Serial.print( iInVal, HEX );
-    Serial.print( "\t" );
-    Serial.println( iLDRValue[0], DEC );*/
-  }
-
-  // Debug graph. Used with SerialChart.
-#ifdef SERIAL_SYNC_DEBUG
-  Serial.print(millis()); Serial.print(","); 		// ms
-  Serial.print(iTargetR); Serial.print(","); 		// Red
-  Serial.print(iTargetG); Serial.print(","); 		// Green
-  Serial.print(iTargetB); Serial.print("\n"); 	// Blue
-#endif
-
-#ifdef SERIAL_SYNC_DEBUG2
-  // Print out the verbose serial debug as csv.
-  Serial.print(millis()); Serial.print(","); 		// ms
-  Serial.print(fSlope); Serial.print(","); 		// slope
-  Serial.print(iLDR1Max); Serial.print(","); 		// Estimated maximum (white + backlight).
-  Serial.print(r); Serial.print(","); 			// Red (estimated)
-  Serial.print(g); Serial.print(","); 			// Green (estimated)
-  Serial.print(b); Serial.print(","); 			// Blue (estimated)
-  Serial.print(iLDR1Min); Serial.print(","); 		// Estimated minimum (black + backlight).
-  Serial.println(iLDRValue);						// ldr raw
-#endif
-
-  // Assume we're always active, for now.
-  return PULSE_STATE__ACTIVE_PULSE;
-}
-
-/**
  * @brief Read new height data from the screen.
  * It will update the iTargetPos value with the height between 0 and MOTOR_TRAVEL.
  */
@@ -440,19 +355,29 @@ void setup() {
 	configure();
 	
 	// Start the serial port.
-	Serial.begin(9600);
+	Serial.begin(115200);
 	
 	// Wait two seconds.
-	Serial.println("hello world");
+	Serial.println("Boot v2.0");
 	
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
-	if (eClipMode != EEMODE_SYNCPULSE && eClipMode != EEMODE_HEIGHTONLY)
-	{
-		EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
-		eClipMode = EEMODE_HEIGHTONLY;
-	}
+        switch( eClipMode )
+        {
+          case EEMODE_SYNCPULSE:
+            break;
+          case EEMODE_HEIGHTONLY:
+            break;
+          case EEMODE_SERIAL:
+            break;
+          default:
+            eClipMode = EEMODE_HEIGHTONLY;
+            EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
+        }
 	
+        // Debug Mode
+        eClipMode = EEMODE_SERIAL;
+
 	// Wait for a random time so that not all clips zero their motor at the same time.
 	randomSeed(analogRead(PIN_RND));
 	uint16_t randomWait = random(1000);
@@ -477,47 +402,181 @@ void detectModeChange() {
 	if (!cycleCheck(&tmrModeCheck, 10U))
 		return;
 	
-	// State for button press detection.
-	static long tmrButtonPress = -1;
-	static boolean bLastState  = true;
-	boolean bState = digitalRead(PIN_SWBOT) == LOW;
-	
-	// Store the time when we go from a not pressed to a pressed state.
-	if (bState == true && bLastState == false) 
-	{
-		tmrButtonPress = millis();
-	}
-	else if (bState == false && bLastState == true)
-	{
-		tmrButtonPress = -1;
-	}
-	bLastState = bState;
-	
-	// If SWBOT has been pressed for X seconds, switch mode.
-	if (tmrButtonPress != -1 && (millis() - tmrButtonPress) > EEMODE_CHANGETIME)
-	{
-		// Prevent it from triggering multiple times.
-		tmrButtonPress = -1;
-		
-		// Toggle mode.
-		int iMode = EEPROM.read(EEMODEADDR);
-		if (iMode == EEMODE_SYNCPULSE)
-		{
-			//Serial.println("height mode");
-			EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
-			eRGBMode  = RGBMODE_NONE;
-			eClipMode = EEMODE_HEIGHTONLY;
-		}
-		else
-		{
-			//Serial.println("sync pulse mode");
-			EEPROM.write(EEMODEADDR, EEMODE_SYNCPULSE);
-			eRGBMode  = RGBMODE_SCREEN;
-			eClipMode = EEMODE_SYNCPULSE;
-		}
-	}
+        if( digitalRead(PIN_SWBOT) == HIGH )
+          return;
+
+        while( digitalRead(PIN_SWBOT) == LOW )
+        {
+          switch( eClipMode )
+          {
+            case EEMODE_HEIGHTONLY:
+              pRGB.setPixelColor(0,  0, 255, 0);
+            
+              eRGBMode  = RGBMODE_SCREEN;
+              eClipMode = EEMODE_SYNCPULSE;
+              break;
+              
+            case EEMODE_SYNCPULSE:
+              pRGB.setPixelColor(0,  0, 0, 255);
+              
+              eRGBMode  = RGBMODE_NONE;
+              eClipMode = EEMODE_SERIAL;
+              break;
+            
+            case EEMODE_SERIAL:
+              pRGB.setPixelColor(0,  255, 0, 0);
+              
+              eRGBMode  = RGBMODE_NONE;
+              eClipMode = EEMODE_HEIGHTONLY;
+              break;
+            
+            default:
+              pRGB.setPixelColor(0,  255, 0, 0);
+              eRGBMode  = RGBMODE_NONE;
+              eClipMode = EEMODE_HEIGHTONLY;
+          }
+          
+          pRGB.show();
+          delay( 1000 );
+        }
+        
+        for( int i=0; i<3; i++ )
+        {
+          switch( eClipMode )
+          {
+            case EEMODE_HEIGHTONLY:
+              pRGB.setPixelColor(0,  255, 0, 0);
+              break;
+            case EEMODE_SYNCPULSE:
+              pRGB.setPixelColor(0,  0, 255, 0);
+              break;
+            case EEMODE_SERIAL:
+              pRGB.setPixelColor(0,  0, 0, 255);
+              break;
+          }
+          pRGB.show();
+          delay( 100 );
+          pRGB.setPixelColor(0,  0, 0, 0);
+          pRGB.show();
+          delay( 100 );
+        }
+        
+        EEPROM.write( EEMODEADDR, eClipMode );
 }
 
+/**
+ * @brief Check the sync pulse and update relevant global variables.
+ * This is automatically rate limited to 5ms samples.
+ * It will update the iTargetR,G,B, iLDR1Max and iLDR1Min values if valid pulses are detected.
+ * @return -1 if check not performed, 1 if we received an active pulse, 0 if we did not.
+ */
+int8_t checkPulse() {
+
+	// Only allow this function to be called once every 5ms.
+	static unsigned long tmr1 = 0;
+	if (!cycleCheck(&tmr1, 5U))
+		return PULSE_STATE__NOT_CHECKED;
+
+	// Define static variables.
+	static WindowVariance* pEstimatedMin = new WindowVariance(5);	// Running 
+	static WindowVariance* pEstimatedMax = new WindowVariance(5);
+	static int r=0; static int g=0; static int b=0;
+	static float x1,x2,y1,y2 = 0;	// Required for slope differentials.
+	static float fSlope = 0.0f;		// Required for slope differentials.
+	static long iLastMinima = 0;	// The time of the last minimal (ms).
+
+	// Read the LDR and reset the serial debug colour values.
+	int iLDRValue = analogRead(PIN_LDR1);
+	r=0; g=0; b=0;
+
+	// Compute the slope (dLDR/dTime) by comparing it to the previous data.
+	long iCurrentTime = millis();
+	x1 = x2; y1 = y2;
+	x2 = (float)iCurrentTime; y2 = (float)iLDRValue;
+	fSlope = (y1-y2) / (x1-x2);
+
+	// If we are hitting a big dip AND it has been over 50ms since the last one.
+	int iDeltaTime = iCurrentTime - iLastMinima;
+	boolean bSlopeDetected = fSlope < -SYNC_SIGNAL_DROP_THRESHOLD;
+	boolean bWithinPulseRange = iDeltaTime > (DATA_WIDTH - DATA_WIDTH_ERR); // &&  delta < (DATA_WIDTH + DATA_WIDTH_ERR + PULSE_WIDTH + PULSE_WIDTH_ERR);
+
+	// TODO: Reject pulses after a recent slope detection.
+	if (bSlopeDetected && bWithinPulseRange)
+	{
+		// Log the start of the second pulse of the data-frame.
+		iLastMinima = iCurrentTime;
+
+		// If another minma happened BEFORE 500ms  (i.e. the amount of time between a high and a red/green)
+		//  then we know that it is likely attached to the wrong pulse.
+	}
+
+	// Determine if this device has a sync pulse.
+	boolean bActive = iDeltaTime < ( DATA_WIDTH + DATA_WIDTH_ERR ) ;
+
+	// If an active sync pulse, sample the data.
+	if (bActive)
+	{
+		// Make it relative to the start of the minima spike.
+		int iRelativeDelta = iCurrentTime - iLastMinima;
+
+		// Sample the min and max.  Min = immediately after the spike, Max = 4th pulse after the spike.
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 0) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Min.
+			pEstimatedMin->push(iLDRValue);
+			iLDR1Min = pEstimatedMin->mean();
+			ldr2.updateMin(iLDR1Min);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 4) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Max.
+			pEstimatedMax->push(iLDRValue);
+			iLDR1Max = pEstimatedMax->mean();
+			ldr2.updateMax(iLDR1Max);
+		}
+
+		// Sample the RGB pulses. R = 1st pulse after the spike, B = 3rd pulse after the spike.
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 1) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Red.
+			r = iLDRValue;
+			iTargetR = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 2) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Green.
+			g = iLDRValue;
+			iTargetG = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+		if (checkSample(iRelativeDelta, (PULSE_WIDTH * 3) + SAMPLE_OFFSET, SAMPLE_WINDOW)) {		// Blue.
+			b = iLDRValue;
+			iTargetB = constrain(map(iLDRValue, iLDR1Min, iLDR1Max, 0, 255), 0, 255);
+		}
+
+		// Ensure we are in a mode that displays a screen colour.
+		//changeMode(SCREEN);
+	}
+	else
+	{
+		// Turn the LED blue (not on screen).
+		//changeMode(NO_SCREEN);
+	}
+
+	// Debug graph. Used with SerialChart. 
+	#ifdef SERIAL_SYNC_DEBUG
+	Serial.print(millis()); Serial.print(","); 		// ms
+	Serial.print(iTargetR); Serial.print(","); 		// Red
+	Serial.print(iTargetG); Serial.print(","); 		// Green
+	Serial.print(iTargetB); Serial.print("\n"); 	// Blue
+	#endif
+	
+	#ifdef SERIAL_SYNC_DEBUG2
+	// Print out the verbose serial debug as csv.
+	Serial.print(millis()); Serial.print(","); 		// ms
+	Serial.print(fSlope); Serial.print(","); 		// slope
+	Serial.print(iLDR1Max); Serial.print(","); 		// Estimated maximum (white + backlight).
+	Serial.print(r); Serial.print(","); 			// Red (estimated)
+	Serial.print(g); Serial.print(","); 			// Green (estimated) 
+	Serial.print(b); Serial.print(","); 			// Blue (estimated)
+	Serial.print(iLDR1Min); Serial.print(","); 		// Estimated minimum (black + backlight).
+	Serial.println(iLDRValue);						// ldr raw
+	#endif
+
+	// Return if we are active or not.
+	return bActive ? PULSE_STATE__ACTIVE_PULSE : PULSE_STATE__NO_PULSE;
+}
 
 /**
  * @brief Handle the clip behaviour for sync pulse mode.
@@ -675,6 +734,94 @@ void loopHeightMode() {
 	
 }
 
+static const unsigned char BitsSetTable256[256] = 
+{
+#   define B2(n) n,     n+1,     n+1,     n+2
+#   define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
+#   define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
+    B6(0), B6(1), B6(1), B6(2)
+};
+
+
+
+WindowVariance * runningVariance = new WindowVariance( 20 );
+int oldState = 0;
+uint16_t bSerialBuffer = 0x00;
+int inputIndex = 0;
+int readState = 0;
+void loopSerialMode()
+{
+  // Only allow this function to be called once every 5ms.
+  static unsigned long tmr1 = 0;
+//if (cycleCheck(&tmr1, 1U))
+  {
+    int iLDRValue[] = { analogRead( PIN_LDR1 ), analogRead( PIN_LDR2 ) };
+    int iInVal = iLDRValue[0] - iLDRValue[1];
+    runningVariance->push( iInVal );
+    
+    //iInVal = constrain( (int)runningVariance->mean(), -512, 512 ) + 512;
+    int variance = runningVariance->variance();
+    
+    int state = constrain( map( iInVal, -450, 500, 0, 4 ), 0, 4 );
+    
+    //Serial.print( variance, DEC );
+    //Serial.print( "\t" );
+    //Serial.print( iInVal, DEC );
+    //Serial.print( "\t" );
+    //Serial.println( state, DEC );
+    
+    
+    if( state != oldState )
+    {
+      switch( state )
+      {
+        case 0:
+          bSerialBuffer = (bSerialBuffer << 1) | 1;
+          break;
+          
+        case 1: inputIndex++; break;
+        
+        case 3:
+          bSerialBuffer = (bSerialBuffer << 1);
+          break;
+      }
+      
+      byte eFrame = (byte)(bSerialBuffer & 0x01);
+      byte parity = (bSerialBuffer >> 1) & 0x01;
+      byte frame  = (byte)((bSerialBuffer >> 2) & 0xFF);
+      byte startBit = (bSerialBuffer >> 10) & 0x01;
+      byte sFrame    = (bSerialBuffer >> 11) & 0x01;
+
+      oldState = state;
+      
+      if( sFrame == 0 && eFrame == 0 && startBit == 1 )
+      {
+        if( (BitsSetTable256[frame] % 2 == 0 && parity == 1) || (BitsSetTable256[frame] % 2 != 0 && parity == 0) )
+        {
+          /*Serial.print( "[" );
+          Serial.print( frame, BIN );
+          Serial.print( " " );
+          Serial.print( frame, HEX );
+          Serial.print( "]\t" );
+          Serial.println( bSerialBuffer, BIN );*/
+          
+          Serial.println( frame, BIN );
+          
+          //iTargetPos = map( frame & 0x7F, 0, 0x7F, 0, MOTOR_TRAVEL );
+          pRGB.setPixelColor(0,  0, 0, frame & 0x7F);
+          pRGB.show();
+          
+          bSerialBuffer = 0;
+        }
+      }
+    }
+
+  }
+
+  moveMotor();
+  //updateColour();
+}
+
 /**
  * Logic loop.
  * The function performs the following tasks:
@@ -697,7 +844,11 @@ void loop() {
 		case EEMODE_SYNCPULSE:
 			loopSyncPulseMode();
 			break;
-		
+
+		case EEMODE_SERIAL:
+                        loopSerialMode();
+                        break;
+
 		// Unknown mode.. should not get here.
 		default:
 			break;
