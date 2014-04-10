@@ -334,9 +334,11 @@ void updateColour() {
 			break;
 		case RGBMODE_STARTUP:
 			if (eClipMode == EEMODE_HEIGHTONLY)
-				pRGB.setPixelColor(0,  0, 0, 255);
-			else
+				pRGB.setPixelColor(0,  255, 0, 0);
+			else if (eClipMode == EEMODE_SYNCPULSE)
 				pRGB.setPixelColor(0,  0, 255, 0);
+			else
+				pRGB.setPixelColor(0,  0, 0, 255);
 			break;
 	}
 	
@@ -377,8 +379,9 @@ void setup() {
 	}
 
 	// Debug Mode
-	eClipMode = EEMODE_SERIAL;
-	detectModeChange();
+	//eClipMode = EEMODE_SERIAL;
+	//eRGBMode  = RGBMODE_SCREEN;
+	detectModeChange( 1 );
 
 	// Wait for a random time so that not all clips zero their motor at the same time.
 	randomSeed(analogRead(PIN_RND));
@@ -397,15 +400,15 @@ void setup() {
  * Holding down SWBOT for 5s will change the clip mode from sync pulse (green startup)
  * to height only (blue startup).
  */
-void detectModeChange() {
+void detectModeChange( byte skip ) {
 	
 	// Throttle this to 10hz.
 	static unsigned long tmrModeCheck = 0;
-	if (!cycleCheck(&tmrModeCheck, 10U))
-		return;
+	//if (!cycleCheck(&tmrModeCheck, 10U))
+	//	return;
 	
-        if( digitalRead(PIN_SWBOT) == HIGH )
-          return;
+    if( digitalRead(PIN_SWBOT) == HIGH && skip != 1 )
+		return;
 
         while( digitalRead(PIN_SWBOT) == LOW )
         {
@@ -428,7 +431,7 @@ void detectModeChange() {
             case EEMODE_SERIAL:
               pRGB.setPixelColor(0,  255, 0, 0);
               
-              eRGBMode  = RGBMODE_NONE;
+              eRGBMode  = RGBMODE_SCREEN;
               eClipMode = EEMODE_HEIGHTONLY;
               break;
             
@@ -658,11 +661,15 @@ void loopSyncPulseMode() {
 void loopHeightMode() {
 	
 	// Determine historic variables for height sampling.
-	static WindowVariance* pMinAvg = new WindowVariance(5);
-	static WindowVariance* pMaxAvg = new WindowVariance(5);
+	//static WindowVariance* pMinAvg = new WindowVariance(5);
+	//static WindowVariance* pMaxAvg = new WindowVariance(5);
+	static uint16_t min = 99999;
+	static uint16_t max = 0;
+	
 	
 	static unsigned long tmrSample = 0;
-	if (cycleCheck(&tmrSample, 100U))
+	//if (cycleCheck(&tmrSample, 100U))
+	if (cycleCheck(&tmrSample, 10U))
 	{
 		// Push new data.
 		int iSample1 = ldr1.sample();
@@ -674,35 +681,49 @@ void loopHeightMode() {
 		// If they are quite different, we are probably not on the screen.
 		boolean bOnScreen = iDelta <= 60;
 		
+		// Sample.
+		uint16_t iMean = (iSample1 + iSample2) * 0.5;
+		
 		// If we are on screen for sure, update the max and mins and height.
 		if (bOnScreen)
 		{
 			// Say we are on the screen.
 			eRGBMode = RGBMODE_NONE;
 			
-			// Sample.
-			uint16_t iMean = (iSample1 + iSample2) / 2;
-			
 			// Snap to means when in region.
-			int iMin = pMinAvg->mean();
-			int iMax = pMaxAvg->mean();
-			if (pMinAvg->count() == 0 || iMin + 20 > iMean) pMinAvg->push(iMean);
-			if (pMaxAvg->count() == 0 || iMax - 20 < iMean) pMaxAvg->push(iMean);
+			//int iMin = pMinAvg->mean();
+			//int iMax = pMaxAvg->mean();
+			//if (pMinAvg->count() == 0 || iMin + 20 > iMean) pMinAvg->push(iMean);
+			//if (pMaxAvg->count() == 0 || iMax - 20 < iMean) pMaxAvg->push(iMean);
+			if (iMean > max) max = iMean;
+			if (iMean < min) min = iMean;
+			
+			if( max > 1000 )
+			{
+				bOnScreen = false;
+			}
 			
 			// Target the motor position.
-			iTargetPos = constrain(map(iMean, iMin, iMax, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
+			iTargetPos = constrain(map(iMean, min, max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
 			
-			/*
-			Serial.print(bOnScreen ? 100 : 0); Serial.print(",");	
-			Serial.print(iMin); Serial.print(",");
-			Serial.print(iMax); Serial.print(",");
+			/**/
+			//Serial.print(bOnScreen ? 100 : 0); Serial.print(",");	
+			Serial.print(min); Serial.print(",");
+			Serial.print(max); Serial.print(",");
 			Serial.print(iMean); Serial.print("\n");
-			*/
+			
 		}
 		else
 		{
 			// Say we are not on the screen.
 			eRGBMode = RGBMODE_NOSCREEN;
+			
+			if( iMean < 800 )
+			{
+				bOnScreen = true;
+				min = 99999;
+				max = 0;
+			}
 			
 			// Deflate max and min incase they got pushed too high or low?
 			//iMin = 0xFFF;
@@ -724,13 +745,12 @@ static const unsigned char BitsSetTable256[256] =
     B6(0), B6(1), B6(1), B6(2)
 };
 
-
-
-WindowVariance * runningVariance = new WindowVariance( 20 );
 int oldState = 0;
 uint16_t bSerialBuffer = 0x00;
 int inputIndex = 0;
 int readState = 0;
+
+unsigned char cmdBuffer[3] = { 0, 0, 0 };
 
 int bitsSeen = 0;
 bool flippedRead = false;
@@ -746,17 +766,12 @@ void loopSerialMode()
 	if( flippedRead )
 		iInVal = iLDRValue[1] - iLDRValue[0];
 		
-	if( bitsSeen > 40 )
+	if( bitsSeen > 80 )
 	{
-		//Serial.println( "Inverted read mode!" );
-		//flippedRead = !flippedRead;
+		Serial.println( "Inverted read mode!" );
+		flippedRead = !flippedRead;
 		bitsSeen = 0;
 	}
-	
-    runningVariance->push( iInVal );
-    
-    //iInVal = constrain( (int)runningVariance->mean(), -512, 512 ) + 512;
-    int variance = runningVariance->variance();
     
     int state = constrain( map( iInVal, -450, 500, 0, 4 ), 0, 4 );
     
@@ -789,36 +804,67 @@ void loopSerialMode()
           break;
       }
       
-      byte eFrame = (byte)(bSerialBuffer & 0x01);
-      byte parity = (bSerialBuffer >> 1) & 0x01;
-      byte frame  = (byte)((bSerialBuffer >> 2) & 0xFF);
-      byte startBit = (bSerialBuffer >> 10) & 0x01;
+	  // 8-bit mode
+      byte eFrame  = (byte)(bSerialBuffer & 0x01);
+      byte parity    = (bSerialBuffer >> 1) & 0x01;
+      byte frame     = (byte)((bSerialBuffer >> 2) & 0xFF);
+      byte startBit  = (bSerialBuffer >> 10) & 0x01;
       byte sFrame    = (bSerialBuffer >> 11) & 0x01;
+	  
+	  // 16-bit mode
+	  /*byte eFrame     = (byte)(bSerialBuffer & 0x01);
+      byte parity     = (bSerialBuffer >> 1) & 0x01;
+      uint16_t frame  = (byte)((bSerialBuffer >> 2) & 0xFFFF);
+      byte startBit   = (bSerialBuffer >> 18) & 0x01;
+      byte sFrame     = (bSerialBuffer >> 19) & 0x01;*/
 
       oldState = state;
       
       if( sFrame == 0 && eFrame == 0 && startBit == 1 )
       {
+		//int bits = BitsSetTable256[(frame & 0xFF)] + BitsSetTable256[((frame >> 8) & 0xFF)];
         if( (BitsSetTable256[frame] % 2 == 0 && parity == 1) || (BitsSetTable256[frame] % 2 != 0 && parity == 0) )
+		//if( (bits % 2 == 0 && parity == 1) || (bits % 2 != 0 && parity == 0) )
         {
 		  bitsSeen = 0;
-          Serial.print( "[" );
+          /*Serial.print( "[" );
           Serial.print( frame, BIN );
           Serial.print( " " );
           Serial.print( frame, HEX );
 		  Serial.print( " " );
           Serial.print( (char)frame );
           Serial.print( "]\t" );
-          Serial.println( bSerialBuffer, BIN );
+          Serial.println( bSerialBuffer, BIN );*/
           
-          //iTargetPos = map( frame & 0x7F, 0, 0x7F, 0, MOTOR_TRAVEL );
-		  switch( frame )
+		  cmdBuffer[0] = cmdBuffer[1];
+		  cmdBuffer[1] = cmdBuffer[2];
+		  cmdBuffer[2] = (unsigned char)(frame & 0xFF);
+		  
+		  Serial.print( "CMD: " );
+		  Serial.print( cmdBuffer[0], HEX );
+		  Serial.print( " " );
+		  Serial.print( cmdBuffer[1], HEX );
+		  Serial.print( " " );
+		  Serial.print( cmdBuffer[2], HEX );
+		  Serial.print( " | " );
+		  Serial.print( (unsigned char)cmdBuffer[0] );
+		  Serial.print( " " );
+		  Serial.print( (unsigned char)cmdBuffer[1] );
+		  Serial.print( " " );
+		  Serial.println( (unsigned char)cmdBuffer[2] );
+		  
+		  if( cmdBuffer[2] == 'X' )
 		  {
-		    case 'R': pRGB.setPixelColor(0,  255, 0, 0); break;
-			case 'G': pRGB.setPixelColor(0,  0, 255, 0); break;
-			case 'B': pRGB.setPixelColor(0,  0, 0, 255); break;
+			  //iTargetPos = map( frame & 0x7F, 0, 0x7F, 0, MOTOR_TRAVEL );
+			  switch( cmdBuffer[0] )
+			  {
+				case 'R': iTargetR = cmdBuffer[1]; break;
+				case 'G': iTargetG = cmdBuffer[1]; break;
+				case 'B': iTargetB = cmdBuffer[1]; break;
+				case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
+			  }
+			  Serial.println( "CMD" );
 		  }
-          pRGB.show();
           
           bSerialBuffer = 0;
         }
@@ -828,7 +874,7 @@ void loopSerialMode()
   }
 
   moveMotor();
-  //updateColour();
+  updateColour();
 }
 
 /**
@@ -839,7 +885,7 @@ void loopSerialMode()
 void loop() {
 	
 	// Listen for a change in mode.
-	detectModeChange();
+	detectModeChange( 0 );
 	
 	// Detect which mode we are in.
 	switch (eClipMode)
