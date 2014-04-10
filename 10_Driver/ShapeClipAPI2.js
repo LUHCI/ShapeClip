@@ -443,10 +443,11 @@ var ShapeClipFastComms = Pad.extend({
 		var packedframe = [];
 		var parity = false;
 		
-		FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+		//FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+		//FRAME,1,  1,1,1,1,1,1,1,0,  OP,
 		
-		packedframe.push(FRAME)	// Frame Start
-		packedframe.push(1)		// Start Bit
+		packedframe.push(255)	// Frame Start
+		packedframe.push(0)		// Start Bit
 		
 		// Pack data.
 		for( var i=0; i<bytes.length; i++ )
@@ -463,7 +464,8 @@ var ShapeClipFastComms = Pad.extend({
 			}
 		}
 		
-		packedframe.push( parity ? EP : OP )		// Party Bit
+		packedframe.push( parity ? 255 : 0 )		// Party Bit
+		//packedframe.push( parity ? EP : OP )		// Party Bit
 		
 		return packedframe;
 	},

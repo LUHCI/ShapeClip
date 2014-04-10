@@ -47,7 +47,7 @@
 					{
 						var pX = 100 + (x * 27); // 29
 						var pY = 100 + (y * 34); // 33
-						var pad = new ShapeClipv1({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						var pad = new ShapeClipFastComms({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
 						pad.rotate(180);
@@ -61,7 +61,7 @@
 				// Configure the UI Slider.
 				document.getElementById("motorSlider").onchange = function(e){
 					var value = this.value * 0.01;
-					for (var i=0; i<pads.length; ++i) pads[i].heightjv(value);
+					for (var i=0; i<pads.length; ++i) pads[i].height(value);
 				};
 				
 				// Configure the colour wheel.
