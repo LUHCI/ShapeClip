@@ -302,7 +302,7 @@ var ShapeClipv1 = Pad.extend({
 	
 	FORCE_REDRAW : true,	// Force a redraw after every pulse.
 	CENTER_SPLIT : true,	// Is there a black space between the two LDR signals?
-	PULSE_WIDTH : 20,		// The time the LDR has to sample each item in _signals. 200ms * 5 (for 5 pulses) is 1 RGB frame per second.
+	PULSE_WIDTH :  50,		// The time the LDR has to sample each item in _signals. 200ms * 5 (for 5 pulses) is 1 RGB frame per second.
 	TRAVEL_HEIGHT : 48.0,	// The number of mm that this ShapeClip unit can travel in mm.  (60mm screw length - 12mm flange height)
 	
 	/**
@@ -355,15 +355,63 @@ var ShapeClipv1 = Pad.extend({
 		//this._signals = [255, 255, 255, 0, 0, 0, 0];
 		//this._signals = [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32];
 		//this._signals = [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-		this._signals = [ 64 ];
+		//this._signals = [ 64 ];
 		//this._signals = [0, 255, 128+32, 128-32];
 		//this._signals = [0xC3, 0x0C, 0x70, 0x80];
 		//this._signals = [0xF0, 0x0F];
 		//this._signals = [0, 1, 2, 4, 8, 16, 32, 64, 128, 255, 255, 255, 255, 255, 255, 255];
 		/*this._signals = [];
-		for( var i=0; i<1000; i+=8 )
-			for( var p=0; p<5; ++p )
-				this._signals.push( 64+(Math.sin(i/100)*64) );*/
+		for( var i=0; i<255; i++ )
+				this._signals.push( i );*/
+				
+		//this._signals = [ 255, 64, 32, 64, 128, 64, 255 ];
+		
+		var EP = 1;
+		var OP = 0;
+		var FRAME = 0;
+		
+		this._signals = [];
+		var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,0,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,1,0,  EP,
+					  FRAME,1,  1,0,0,0,0,1,0,0,  EP,
+					  FRAME,1,  1,0,0,0,1,0,0,0,  EP,
+					  FRAME,1,  1,0,0,1,0,0,0,0,  EP,
+					  FRAME,1,  1,0,1,0,0,0,0,0,  EP,
+					  FRAME,1,  1,1,0,0,0,0,0,0,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,0,  OP,
+					  FRAME,1,  1,1,0,0,0,0,0,0,  EP,
+					  FRAME,1,  1,0,1,0,0,0,0,0,  EP,
+					  FRAME,1,  1,0,0,1,0,0,0,0,  EP,
+					  FRAME,1,  1,0,0,0,1,0,0,0,  EP,
+					  FRAME,1,  1,0,0,0,0,1,0,0,  EP,
+					  FRAME,1,  1,0,0,0,0,0,1,0,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  ];
+					  
+		/*var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
+					  ];*/
+		
+		for( var i=0; i<input.length; i++ )
+		{
+			this._signals.push( 128 );
+			if( input[i] == 1 )
+				this._signals.push( 255 );
+			else
+				this._signals.push( 0 );
+		}
+		
+		
 		
 		// Pulsing values.
 		this._bStopPulse = false;
@@ -616,9 +664,10 @@ var ShapeClipv1 = Pad.extend({
 			// Update graphics (approx 4ms timer error "on my machine" TM)
 			var date = new Date();
 			var millis = date.getMilliseconds();
-			var phase = 128 + Math.sin((millis/100)/Math.PI ) * 16;
-			var ldr1tmp = phase + that._signals[signal];
-			var ldr2tmp = phase - that._signals[signal];
+			//var phase = 128 + Math.sin((millis/100)/Math.PI ) * 64;
+			var phase = 128;
+			var ldr1tmp = (phase - ( that._signals[signal] - 128 )) / 2.0;
+			var ldr2tmp = (phase + ( that._signals[signal] - 128 )) / 2.0;
 			
 			that._ldr1b( ldr1tmp );
 			that._ldr2b( ldr2tmp );
