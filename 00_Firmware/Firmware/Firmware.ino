@@ -363,21 +363,22 @@ void setup() {
 	
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
-        switch( eClipMode )
-        {
-          case EEMODE_SYNCPULSE:
-            break;
-          case EEMODE_HEIGHTONLY:
-            break;
-          case EEMODE_SERIAL:
-            break;
-          default:
-            eClipMode = EEMODE_HEIGHTONLY;
-            EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
-        }
-	
-        // Debug Mode
-        eClipMode = EEMODE_SERIAL;
+	switch( eClipMode )
+	{
+	  case EEMODE_SYNCPULSE:
+		break;
+	  case EEMODE_HEIGHTONLY:
+		break;
+	  case EEMODE_SERIAL:
+		break;
+	  default:
+		eClipMode = EEMODE_HEIGHTONLY;
+		EEPROM.write(EEMODEADDR, EEMODE_HEIGHTONLY);
+	}
+
+	// Debug Mode
+	eClipMode = EEMODE_SERIAL;
+	detectModeChange();
 
 	// Wait for a random time so that not all clips zero their motor at the same time.
 	randomSeed(analogRead(PIN_RND));
@@ -730,6 +731,9 @@ int oldState = 0;
 uint16_t bSerialBuffer = 0x00;
 int inputIndex = 0;
 int readState = 0;
+
+int bitsSeen = 0;
+bool flippedRead = false;
 void loopSerialMode()
 {
   // Only allow this function to be called once every 5ms.
@@ -738,6 +742,17 @@ void loopSerialMode()
   {
     int iLDRValue[] = { analogRead( PIN_LDR1 ), analogRead( PIN_LDR2 ) };
     int iInVal = iLDRValue[0] - iLDRValue[1];
+	
+	if( flippedRead )
+		iInVal = iLDRValue[1] - iLDRValue[0];
+		
+	if( bitsSeen > 40 )
+	{
+		//Serial.println( "Inverted read mode!" );
+		//flippedRead = !flippedRead;
+		bitsSeen = 0;
+	}
+	
     runningVariance->push( iInVal );
     
     //iInVal = constrain( (int)runningVariance->mean(), -512, 512 ) + 512;
@@ -754,16 +769,23 @@ void loopSerialMode()
     
     if( state != oldState )
     {
+	  bitsSeen++;
+	
       switch( state )
       {
         case 0:
           bSerialBuffer = (bSerialBuffer << 1) | 1;
+		  Serial.print( "^" );
           break;
           
-        case 1: inputIndex++; break;
+        case 1:
+			inputIndex++;
+			Serial.print( "~" );
+			break;
         
         case 3:
           bSerialBuffer = (bSerialBuffer << 1);
+		  Serial.print( "_" );
           break;
       }
       
@@ -779,17 +801,23 @@ void loopSerialMode()
       {
         if( (BitsSetTable256[frame] % 2 == 0 && parity == 1) || (BitsSetTable256[frame] % 2 != 0 && parity == 0) )
         {
-          /*Serial.print( "[" );
+		  bitsSeen = 0;
+          Serial.print( "[" );
           Serial.print( frame, BIN );
           Serial.print( " " );
           Serial.print( frame, HEX );
+		  Serial.print( " " );
+          Serial.print( (char)frame );
           Serial.print( "]\t" );
-          Serial.println( bSerialBuffer, BIN );*/
-          
-          Serial.println( frame, BIN );
+          Serial.println( bSerialBuffer, BIN );
           
           //iTargetPos = map( frame & 0x7F, 0, 0x7F, 0, MOTOR_TRAVEL );
-          pRGB.setPixelColor(0,  0, 0, frame & 0x7F);
+		  switch( frame )
+		  {
+		    case 'R': pRGB.setPixelColor(0,  255, 0, 0); break;
+			case 'G': pRGB.setPixelColor(0,  0, 255, 0); break;
+			case 'B': pRGB.setPixelColor(0,  0, 0, 255); break;
+		  }
           pRGB.show();
           
           bSerialBuffer = 0;

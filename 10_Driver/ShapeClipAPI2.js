@@ -306,7 +306,7 @@ var ShapeClipFastComms = Pad.extend({
 	
 	FORCE_REDRAW : true,	// Force a redraw after every pulse.
 	CENTER_SPLIT : true,	// Is there a black space between the two LDR signals?
-	PULSE_WIDTH :  50,		// The time the LDR has to sample each item in _signals. 200ms * 5 (for 5 pulses) is 1 RGB frame per second.
+	PULSE_WIDTH :  40,		// The time the LDR has to sample each item in _signals. 200ms * 5 (for 5 pulses) is 1 RGB frame per second.
 	TRAVEL_HEIGHT : 48.0,	// The number of mm that this ShapeClip unit can travel in mm.  (60mm screw length - 12mm flange height)
 	
 	/**
@@ -377,9 +377,9 @@ var ShapeClipFastComms = Pad.extend({
 		
 
 		
-		this._signals = [];
+		/*this._signals = [];
 		var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,0,  EP,
+					  FRAME,1,  1,0,0,0,0,0,0,0,  OP,
 					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
 					  FRAME,1,  1,0,0,0,0,0,1,0,  EP,
 					  FRAME,1,  1,0,0,0,0,1,0,0,  EP,
@@ -395,7 +395,7 @@ var ShapeClipFastComms = Pad.extend({
 					  FRAME,1,  1,0,0,0,0,1,0,0,  EP,
 					  FRAME,1,  1,0,0,0,0,0,1,0,  EP,
 					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  ];
+					  ];*/
 					  
 		/*var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
 					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
@@ -409,20 +409,29 @@ var ShapeClipFastComms = Pad.extend({
 					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
 					  ];*/
 		
-		for( var i=0; i<input.length; i++ )
+		/*for( var i=0; i<input.length; i++ )
 		{
 			this._signals.push( 128 );
 			if( input[i] == 1 )
 				this._signals.push( 255 );
 			else
 				this._signals.push( 0 );
-		}
+		}*/
+		
+		//this._signals = [0, 1, 2, 4, 8, 16, 32, 64, 128, 255, 255, 255, 255, 255, 255, 255];
 		
 		// Use the packer.
 		//var a = this._packBytes([0,0,0,0, 1,1,1,1]);
 		//var b = this._packBytes([1,1,1,1, 0,0,0,0]);
-		//var c = this._pack(0x88);
+		this._signals = [];
+		this._signals = this._signals.concat( this._pack( 0xff ) );
+		this._signals = this._signals.concat( this._pack("R".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack("G".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack("B".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0xff ) );
 		//this._signals = a.concat(b).concat(c);
+		
+		console.log( this._signals );
 		
 		// Pulsing values.
 		this._bStopPulse = false;
@@ -455,16 +464,17 @@ var ShapeClipFastComms = Pad.extend({
 			packedframe.push( 128 );
 			if( bytes[i] == 1 )
 			{
-				packedframe.push( 255 );
+				packedframe.push( 0 );
 				parity = !parity;
 			}
 			else
 			{
-				packedframe.push( 0 );
+				packedframe.push( 255 );
 			}
 		}
-		
+		packedframe.push( 128 );
 		packedframe.push( parity ? 255 : 0 )		// Party Bit
+		packedframe.push( 128 );
 		//packedframe.push( parity ? EP : OP )		// Party Bit
 		
 		return packedframe;
