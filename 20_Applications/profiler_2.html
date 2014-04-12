@@ -16,7 +16,7 @@
 			
 			#colourwheel { position: fixed; bottom: 100px; left: 100px; }
 			#controls { position: fixed; bottom: 50px; left: 100px;  }
-			#sugar { pointer-events: none; z-index: -99; position: fixed; bottom: 1cm; right: 1cm; color: #111; font-size: 5cm; font-family: 'Cabin', sans-serif; text-shadow: 1px 1px #222, -1px -1px #111}
+			#sugar { pointer-events: none; z-index: -99; position: fixed; bottom: 1cm; right: 1cm; color: #222; font-size: 5cm; font-family: 'Cabin', sans-serif; text-shadow: 1px 1px #222, -1px -1px #111}
 		</style>
 		
 		<!-- Shape Clip -->
@@ -54,18 +54,22 @@
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
 				
-				// 
+				// Create one clip.
+				pad = new ShapeClipHeight({x: __px(100), y: __px(100), width: SC_SIZE, height: SC_SIZE});
+				pad.outline(true);
+				//pad.pulse();
+				pad.height(1.0);
 				
 				
 			});
 			
 			function start() {
 				
-
+				return;
 				
 				
 				// Create a shape clip pad.
-				pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+				//pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 				
 				
 				// Create a large pad grid.
@@ -212,7 +216,7 @@
 			<input id="motorSlider" type="range" value="0" min="0" max="100" />
 			<button id="btnBegin">Start Experiment</button>
 		</div>
-		<div id="sugar"><span>ShapeClip</span><span>v1</span></div>
+		<div id="sugar"><span>ShapeClip</span><span></span></div>
 	</body>
 	
 </html>

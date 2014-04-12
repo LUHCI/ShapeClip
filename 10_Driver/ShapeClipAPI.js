@@ -87,7 +87,7 @@ var Pad = Class.extend({
 	init: function(settings) {
 		
 		// Check the DOM is ready.
-		if (document.readyState != "complete")
+		if (!(document.readyState == "complete" || document.readyState == "interactive"))
 			throw "Page not ready.  Please only create pads when the page is ready.";
 		
 		// Check for required data.
