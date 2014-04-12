@@ -51,6 +51,13 @@
 			
 			$(document).ready(function(){
 				
+				var device = (/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase()));
+				console.log(navigator.userAgent.toLowerCase());
+				$("#report").text(navigator.userAgent.toLowerCase());
+				
+				//if (true) {__ppi()};	// Override PPI for Nexus5
+				//if (true) {__ppi()};	// Override PPI for iPad mini
+				
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
 				
@@ -215,6 +222,7 @@
 		<div id="controls">
 			<input id="motorSlider" type="range" value="0" min="0" max="100" />
 			<button id="btnBegin">Start Experiment</button>
+			<span id="report"></span>
 		</div>
 		<div id="sugar"><span>ShapeClip</span><span></span></div>
 	</body>
