@@ -6,7 +6,8 @@
 		JV - John Vidler
 		MS - Matthias Schitthelm
 	
-	v2.1 - JS - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
+	v2.2 - JH - Motor driver accumulator. Known bug which does not let it drive to the extents.
+	v2.1 - JH - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
 	v2.0 - JH - Second version, re-factored and ready for UIST + profiling.
 	v1.6 - JV - Updated modes.
 	v1.5 - JV - Serial comms added.
@@ -244,6 +245,7 @@ void zeroMotor() {
 
 /**
  * @brief Move the motor one step towards the target position.
+ * TODO: There is currently an edge case where we cannot drive the motor all the way to the top.
  */
 void moveMotor() {
 	
@@ -251,11 +253,91 @@ void moveMotor() {
 	if (!bMotorCalibrated)
 		return;
 	
+	#define STEP_ACCM_SIZE 5								// The max number of steps to accumulate before batching.
+	static boolean bAllowMotorShutdown = true;				// Is the motor allowed to shutdown.
+	static unsigned long shutdownTimeout = millis();		// The time of the last step.
+	static unsigned int iStepAccumulator = 0;				// The step accumulator.
+	
+	
+	// If we have a small change in position, add it to the accumulator.
+	//   so that we can batch it later.  If we do not do this, small steps
+	//   are often lost.
+	//   This also has the nice side effect as acting like a noise absorber.
+	int iDelta = iTargetPos - iMotorPosition;
+	if (abs(iDelta) < STEP_ACCM_SIZE)
+	{
+		iStepAccumulator += iDelta;
+		iDelta = 0;
+	}
+	
+	// If the accumulated steps + the change this frame is over the minimum step, then step.
+	int iAdjustedSteps = iStepAccumulator + iDelta;
+	
+	// Or if we are at either end (the accumulator would absorb it, so we need a (literal) edge case).
+	//bool bEdgeCase = ((iTargetPos < (0 + STEP_ACCM_SIZE)) || (iTargetPos > (MOTOR_TRAVEL - STEP_ACCM_SIZE)) & abs(iAdjustedSteps) > 2) ;
+	
+	// Do the check.
+	if (abs(iAdjustedSteps) >= STEP_ACCM_SIZE /* || bEdgeCase */) 
+	{
+		// Compute the step direction.
+		int step = iAdjustedSteps >= 0 ? 1 : -1;
+		
+		/* vv This approach leads to jumpy / inconsistent step behaviours.
+		// Limit to 25 steps per frame.
+		if (abs(iAdjustedSteps) <= 25)
+		{
+			motor.step(step * iAdjustedSteps);
+			iMotorPosition += (step * iAdjustedSteps);
+		}
+		else
+		{
+			motor.step(step * 25);
+			iMotorPosition += (step * 25);
+		}
+		*/
+		
+		/* vv This approach leads to faster and smoother stepping, kinda tearing noisy tho. */
+		if (abs(iAdjustedSteps) > 20)
+		{
+			motor.step(step * 20);
+			iMotorPosition += (step * 20);
+		}
+		if (abs(iAdjustedSteps) > 10)
+		{
+			motor.step(step * 10);
+			iMotorPosition += (step * 10);
+		}
+		else
+		{
+			motor.step(step);
+			iMotorPosition += step;
+		}
+		
+		// Write the last step time.
+		shutdownTimeout = millis();
+		bAllowMotorShutdown = true;
+	}
+	
+	// If we have not stepped for 0.5s, turn off the motor.
+	if ((millis() - shutdownTimeout) > 250)
+	{
+		// If we have not already shut the motor down.
+		if (bAllowMotorShutdown)
+		{
+			motor.shutdown();
+			bAllowMotorShutdown = false;
+		}
+	}
+	
+	
+	
+	
+	/*
 	// Compute the distance to travel.
 	int iDelta = iTargetPos - iMotorPosition;
 	
 	// If we have to move over 2 steps in either direction.
-	if (abs(iDelta) > 2)
+	if (abs(iDelta) > 1)
 	{
 		// Move one step in the correct direction and update the motor position.
 		int step = iDelta >= 0 ? 1 : -1;
@@ -285,6 +367,7 @@ void moveMotor() {
 	{
 		motor.shutdown();
 	}
+	*/
 }
 
 /**
@@ -345,7 +428,7 @@ void setup() {
 	Serial.begin(115200);
 	
 	// Wait two seconds.
-	Serial.println("Boot v2.1");
+	Serial.println("Boot v2.2");
 	
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
