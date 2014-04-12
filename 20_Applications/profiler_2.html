@@ -51,9 +51,13 @@
 			
 			$(document).ready(function(){
 				
-				var device = (/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase()));
+				// Correct ppi value.
+				var agent = navigator.userAgent.toLowerCase();
+				if (agent.indexOf("windows")) 		{ }
+				else if (agent.indexOf("nexus 5")) 	{ __ppi(445); }
+				else if (agent.indexOf("ipad")) 	{ __ppi(326); }
 				console.log(navigator.userAgent.toLowerCase());
-				$("#report").text(navigator.userAgent.toLowerCase());
+				//$("#report").text(navigator.userAgent.toLowerCase());
 				
 				//if (true) {__ppi()};	// Override PPI for Nexus5
 				//if (true) {__ppi()};	// Override PPI for iPad mini
@@ -62,7 +66,7 @@
 				var SC_SIZE = __px(20);
 				
 				// Create one clip.
-				pad = new ShapeClipHeight({x: __px(100), y: __px(100), width: SC_SIZE, height: SC_SIZE});
+				pad = new ShapeClipHeight({x: __px(10), y: __px(10), width: SC_SIZE, height: SC_SIZE});
 				pad.outline(true);
 				//pad.pulse();
 				pad.height(1.0);
