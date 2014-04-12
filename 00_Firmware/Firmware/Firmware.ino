@@ -437,6 +437,7 @@ void detectModeChange( byte skip ) {
 	iTargetG = 0;
 	iTargetB = 0;
 	iTargetPos = 0;
+	bOnScreen = false;
 	
 	// Store new mode to EEPROM.
 	EEPROM.write( EEMODEADDR, eClipMode );
@@ -787,13 +788,6 @@ void loopSerialMode() {
 	#ifdef SSMODE_16BIT
 	static uint32_t bSerialBuffer = 0x00;					// The buffer to write serial commands into. 32 bit (we need space for frame headers, parity, etc).
 	#endif
-	static const unsigned char BitsSetTable256[256] = 		// A bit table to help quickly compute the parity of the data recieved.
-	{
-		#define B2(n) n,     n+1,     n+1,     n+2
-		#define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
-		#define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
-		B6(0), B6(1), B6(1), B6(2)
-	};
 	
 	// Different symbols.
 	#define SYMB_LOW 0
@@ -807,13 +801,13 @@ void loopSerialMode() {
 	// Cacluate the midpoint.
 	int m = ((iLDRValue[1] - iLDRValue[0]) / 2.0) +  iLDRValue[0];
 	
+	// Convert the LDR value into a symbol.
 	int state = SYMB_ZERO;
 	int thresh = 100;
 	if      (iLDRValue[0] < (m-thresh) && iLDRValue[1] > (m+thresh)) state = SYMB_LOW;
 	else if (iLDRValue[1] < (m-thresh) && iLDRValue[0] > (m+thresh)) state = SYMB_HIGH;
 	
-	
-	/* Create the state transition graph.
+	/* Create the state transition graph.  Can be used to count bits - very useful for debugging serial line.
 	static unsigned long tmr1 = 0;
 	if (cycleCheck(&tmr1, 10U))
 	{
@@ -826,7 +820,6 @@ void loopSerialMode() {
 	}
 	*/
 	
-	/*
 	// If we are possibly inverted, invert the values!
 	if( flippedRead )
 		iInVal = iLDRValue[1] - iLDRValue[0];
@@ -840,10 +833,7 @@ void loopSerialMode() {
 		flippedRead = !flippedRead;
 		bitsSeen = 0;
 	}
-	*/
 	
-	// Convert the LDR value into a symbol.
-	//int state = constrain( map( iInVal, -450, 500, 0, 4 ), 0, 4 );
 	
 	// If there has been a change in state.
 	if( state != oldState )
@@ -884,9 +874,9 @@ void loopSerialMode() {
 		}
 		
 		// Unpack the bit values from a frame.  Based on RS232.
-		// |----------------|---------------|--------|--------|--------|--------|--------|--------|--------|--------|--------|-------\
-		// | START FRAME 1  |  START BIT 0  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  | PARITY |  START FRAME 2
-		// |----------------|---------------|--------|--------|--------|--------|--------|--------|--------|--------|--------|---------\
+		// |----------|----------|----------|--------|--------|--------|--------|--------|--------|--------|--------|--------|-------\
+		// | SFRAME2  |  SFRAME  | STARTBIT |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  | PARITY |  EFRAME
+		// |----------|----------|----------|--------|--------|--------|--------|--------|--------|--------|--------|--------|---------\
 		
 		// 8-bit mode
 		#ifdef SSMODE_8BIT
@@ -899,7 +889,7 @@ void loopSerialMode() {
 		byte sFrame2    = (byte)((bSerialBuffer >> 12) & 0x01);	// Should = 1 = eFrame (they are the same bit)
 		#endif
 		
-		// 16-bit mode
+		// 16-bit mode DOES NOT INCLUDE SFRAME2
 		/*
 		#ifdef SSMODE_16BIT
 		byte eFrame     = (byte)(bSerialBuffer & 0x01);
@@ -911,118 +901,70 @@ void loopSerialMode() {
 		*/
 		
 		// Check for valid frame... (see above).
-		byte f2 = frame;
-		bool bFrameParity = !parity_even_bit(frame);
+		byte data = frame;
+		bool bFrameParity = !parity_even_bit(frame);	// <-- this implementation overwrites the input 'frame'.
 		bool bParityCheck = (bFrameParity == 0 && parity == 0) || (bFrameParity == 1 && parity == 1);
-		
-		//bool bParityCheck = (BitsSetTable256[frame] % 2 == 0 && parity == 1) || (BitsSetTable256[frame] % 2 != 0 && parity == 0);
-		if (eFrame == 0 && startBit == 0 && sFrame == 1 && sFrame2 == 0 && bParityCheck)// && bParityCheck)
+		if (eFrame == 0 && startBit == 0 && sFrame == 1 && sFrame2 == 0 && bParityCheck)
 		{
-			Serial.println(" <-- valid frame ");
+			// Wipe the serial buffer ready for the next frame.
 			bSerialBuffer = 0;
 			
+			Serial.println(" <-- valid frame ");
 			Serial.print("  [");
-			Serial.print(f2, BIN);
+			Serial.print(data, BIN);
 			Serial.print("]  ");
-			Serial.println( f2, HEX );
-			/*
-			Serial.print( "\t" );
+			Serial.println( data, HEX );
 			
-			Serial.print( "[" ); Serial.print( sFrame );
-			Serial.print( " " ); Serial.print( startBit );
+			// Reset the number of bits seen.
+			bitsSeen = 0;
 			
-			Serial.print( "  " ); Serial.print( frame, BIN ); Serial.print( " " );
-			
-			Serial.print( " " ); Serial.print( parity );
-			Serial.print( " " ); Serial.print( eFrame );
-			Serial.print( "]\n" );
-			*/
-		
-		}
-		
-		/*
-		// If it looks like a valid frame... (see above).
-		//if( sFrame == 0 && eFrame == 0 && startBit == 1 )
-		if( sFrame == 0 && startBit == 1  &&  stop2 == 1 && stop1 == 0)
-		{
-			// If the parity of the data in the frame matches the parity bit.
-			#ifdef SSMODE_8BIT
-			if( (BitsSetTable256[frame] % 2 == 0 && parity == 1) || (BitsSetTable256[frame] % 2 != 0 && parity == 0) )
+			#ifdef SSMODE_STREAMPRINT
+			// Print out the frame we think is valid.
+			Serial.print( "[" );
+			Serial.print( data, BIN );
+			Serial.print( " " );
+			Serial.print( data, HEX );
+			Serial.print( " " );
+			Serial.print( (char)data );
+			Serial.print( "]\t" );
+			//Serial.println( bSerialBuffer, BIN ); //<-wiped
 			#endif
-			#ifdef SSMODE_16BIT
-			int bits = BitsSetTable256[(frame & 0xFF)] + BitsSetTable256[((frame >> 8) & 0xFF)];
-			if( (bits % 2 == 0 && parity == 1) || (bits % 2 != 0 && parity == 0) )
+			
+			// Fill the command buffer.
+			cmdBuffer[0] = cmdBuffer[1];
+			cmdBuffer[1] = cmdBuffer[2];
+			cmdBuffer[2] = (unsigned char)(data & 0xFF);
+			
+			#ifdef SSMODE_CMDPRINT
+			// Print out the command buffer.
+			Serial.print( "CMD: " );
+			Serial.print( cmdBuffer[0], HEX );
+			Serial.print( " " );
+			Serial.print( cmdBuffer[1], HEX );
+			Serial.print( " " );
+			Serial.print( cmdBuffer[2], HEX );
+			Serial.print( " | " );
+			Serial.print( (unsigned char)cmdBuffer[0] );
+			Serial.print( " " );
+			Serial.print( (unsigned char)cmdBuffer[1] );
+			Serial.print( " " );
+			Serial.println( (unsigned char)cmdBuffer[2] );
 			#endif
+			
+			// If we have an 'X' at the end, the command is valid.
+			if( cmdBuffer[2] == 'X' )
 			{
-				// Reset the number of bits seen.
-				bitsSeen = 0;
-				
-				#ifdef SSMODE_STREAMPRINT
-				// Print out the frame we think is valid.
-				Serial.print( "[" );
-				Serial.print( frame, BIN );
-				Serial.print( " " );
-				Serial.print( frame, HEX );
-				Serial.print( " " );
-				Serial.print( (char)frame );
-				Serial.print( "]\t" );
-				Serial.println( bSerialBuffer, BIN );
-				#endif
-				
-				// Fill the command buffer.
-				cmdBuffer[0] = cmdBuffer[1];
-				cmdBuffer[1] = cmdBuffer[2];
-				cmdBuffer[2] = (unsigned char)(frame & 0xFF);
-				
-				#ifdef SSMODE_CMDPRINT
-				// Print out the command buffer.
-				Serial.print( "CMD: " );
-				Serial.print( cmdBuffer[0], HEX );
-				Serial.print( " " );
-				Serial.print( cmdBuffer[1], HEX );
-				Serial.print( " " );
-				Serial.print( cmdBuffer[2], HEX );
-				Serial.print( " | " );
-				Serial.print( (unsigned char)cmdBuffer[0] );
-				Serial.print( " " );
-				Serial.print( (unsigned char)cmdBuffer[1] );
-				Serial.print( " " );
-				Serial.println( (unsigned char)cmdBuffer[2] );
-				#endif
-				
-				// If we have an 'X' at the end, the command is valid.
-				if( cmdBuffer[2] == 'X' )
+				switch( cmdBuffer[0] )
 				{
-					switch( cmdBuffer[0] )
-					{
-						case 'R': iTargetR = cmdBuffer[1]; break;
-						case 'G': iTargetG = cmdBuffer[1]; break;
-						case 'B': iTargetB = cmdBuffer[1]; break;
-						case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
-					}
+					case 'R': iTargetR = cmdBuffer[1]; break;
+					case 'G': iTargetG = cmdBuffer[1]; break;
+					case 'B': iTargetB = cmdBuffer[1]; break;
+					case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
 				}
-				
-				// Wipe the serial buffer ready for the next frame.
-				bSerialBuffer = 0;
 			}
+		
 		}
-		else
-		{
-			Serial.print( bSerialBuffer, BIN );
-			Serial.print( "\t" );
-			
-			Serial.print( "[" ); Serial.print( sFrame );
-			Serial.print( " " ); Serial.print( startBit );
-			
-			Serial.print( " " ); Serial.print( frame, BIN ); Serial.print( " " );
-			
-			Serial.print( " " ); Serial.print( parity );
-			Serial.print( " " ); Serial.print( stop2 );
-			Serial.print( " " ); Serial.print( stop1 );
-			Serial.print( "]\n" );
-				
-		}
-		*/
+		
 	}
 	
 

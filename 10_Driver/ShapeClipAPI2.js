@@ -288,9 +288,6 @@ var Pad = Class.extend({
 });
 
 
-var EP = 1;
-var OP = 0;
-var FRAME = 0;
 
 /**
  * @brief The ShapeClipv1 is a Pad which can move the ShapeClip v1 up and down.
