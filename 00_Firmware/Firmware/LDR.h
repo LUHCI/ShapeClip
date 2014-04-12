@@ -44,7 +44,15 @@ class LDR
 	// Sets the maximum value if the new value is greater than the previous one
 	__inline__ void updateMax(uint16_t value) { this->max = max(this->max, value & 0x3FF); }
 
+	// Reset the limits of the max and min (0xFFF and 0x00) respective.
 	__inline__ void resetLimits() { this->max = 0x000; this->min = 0xFFF; }
+	
+	// Check to see if the LDR max and min fall within an expected range. min and max based on screen characteristics.
+	__inline__ boolean limitsInRange(uint16_t min, uint16_t max)
+	{ 
+		uint16_t iExtentDelta = abs(max - min);
+		return (iExtentDelta > min) && (iExtentDelta < max );
+	}
 	
 	// Maps a previously read value from min/max to from/to
 	uint16_t mapMinMax(uint16_t value, long from, long to);
