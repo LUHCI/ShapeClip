@@ -47,7 +47,7 @@
 			var ws;
 			
 			var serial = null;	// The serial port (via web socket).
-			var pad = null; 	// The shape clip pad.
+			var syncpulse_pad = null; 	// The shape clip pad.
 			
 			$(document).ready(function(){
 				
@@ -56,20 +56,24 @@
 				if 		(agent.indexOf("windows") 	!= -1) 	{ }
 				if 		(agent.indexOf("nexus 5") 	!= -1) 	{ __ppi(150); }
 				else if (agent.indexOf("ipad") 		!= -1) 	{ __ppi(160); }
-				console.log(navigator.userAgent.toLowerCase());
-				//$("#report").text(navigator.userAgent.toLowerCase());
-				
-				//if (true) {__ppi()};	// Override PPI for Nexus5
-				//if (true) {__ppi()};	// Override PPI for iPad mini
+				console.log("User Agent: " + navigator.userAgent.toLowerCase());
 				
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
 				
 				// Create one clip.
-				pad = new ShapeClipHeight({x: __px(10), y: __px(10), width: SC_SIZE, height: SC_SIZE});
-				pad.outline(true);
-				//pad.pulse();
-				pad.height(1.0);
+				height_pad = new ShapeClipHeight({x: __px(30), y: __px(30), width: SC_SIZE, height: SC_SIZE});
+				height_pad.outline(true);
+				height_pad.height(1.0);
+				
+				// Create one clip.
+				syncpulse_pad = new ShapeClip({x: __px(30), y: __px(60), width: SC_SIZE, height: SC_SIZE});
+				syncpulse_pad.outline(true);
+				syncpulse_pad.pulse(1.0);
+				syncpulse_pad.height(1.0);
+				
+				// Add a new button to start profiling.
+				$("<div>").text("profile clip")
 				
 				
 			});

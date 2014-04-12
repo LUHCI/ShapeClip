@@ -6,6 +6,7 @@
 		JV - John Vidler
 		MS - Matthias Schitthelm
 	
+	v2.3 - JH - Fixes to serial RGB colour display.
 	v2.2 - JH - Motor driver accumulator. Known bug which does not let it drive to the extents.
 	v2.1 - JH - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
 	v2.0 - JH - Second version, re-factored and ready for UIST + profiling.
@@ -313,6 +314,9 @@ void moveMotor() {
 			iMotorPosition += step;
 		}
 		
+		//Serial.print("Stepping ");
+		//Serial.println(iAdjustedSteps);
+		
 		// Write the last step time.
 		shutdownTimeout = millis();
 		bAllowMotorShutdown = true;
@@ -428,7 +432,7 @@ void setup() {
 	Serial.begin(115200);
 	
 	// Wait two seconds.
-	Serial.println("Boot v2.2");
+	Serial.println("Boot v2.3");
 	
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
@@ -1067,10 +1071,11 @@ void loopSerialMode() {
 			{
 				switch( cmdBuffer[0] )
 				{
-					case 'R': iTargetR = cmdBuffer[1]; break;
-					case 'G': iTargetG = cmdBuffer[1]; break;
-					case 'B': iTargetB = cmdBuffer[1]; break;
+					case 'R': iTargetR = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
+					case 'G': iTargetG = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
+					case 'B': iTargetB = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
 					case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
+					case 'z': zeroMotor(); break;
 				}
 			}
 		

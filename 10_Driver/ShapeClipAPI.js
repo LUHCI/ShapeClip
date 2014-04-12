@@ -679,6 +679,7 @@ var ShapeClipHeight = Pad.extend({
 	 *      settings.height 	- The total height of the pad (px).
 	 *      settings.x   		- The horizontal centre position of the pad from the top-left of the screen (px).
 	 *      settings.y   		- The vertical centre position of the pad from the top-left of the screen (px).
+	 *      settings.round   	- Should the pad be round/elliptical.
 	 *      settings.angle   	- The rotation applied to this pad in degrees.  0 degrees is the top of the screen.
 	 *      settings.parent     - The parent element within which to add the pad.
 	 *      settings.mouserot   - Is mouse rotation on scroll enabled. Boolean, true by default.
@@ -699,6 +700,23 @@ var ShapeClipHeight = Pad.extend({
 		this._ldrElement.style["background-color"] = "white";
 		this._ldrElement.style["pointer-events"] = "none";
 		this._element.appendChild(this._ldrElement);
+		
+		// Remove clipped corner.
+		this._element.style["border-radius"] = "4px";
+		this._element.style["overflow"] = "hidden";
+		
+		// Add roundness.
+		if (settings.round == true)
+		{
+			// Set the round corners.
+			this._element.style["border-radius"] = "50%";
+			
+			// Enlarge.
+			//var dim = this.size();
+			//var pos = this.position();
+			//this.size(dim.width * 2, dim.height * 2);
+			//this.position(pos.x, pos.y);
+		}
 		
 		// LDR values.
 		this._ldr(0.0);
@@ -788,7 +806,7 @@ var ShapeClipSerial = Pad.extend({
 
 	FORCE_REDRAW : true,	// Force a redraw after every pulse.
 	CENTER_SPLIT : true,	// Is there a black space between the two LDR signals?
-	PULSE_WIDTH :  60,		// The line state time for each bit.  Can run at 30 well enough. 
+	PULSE_WIDTH :  50,		// The line state time for each bit.  Can run at 30 well enough. 
 	
 	PULSE_SPLIT : true,		// Do we want to split pulses that bring the line back to 0.  True is optimised, but slightly less reliable at fast pulse widths.
 	FRAME_PACK : false,		// Do we want to pack the start of each transmission frame with line 0.  Helps debug and reliability but slows down.
