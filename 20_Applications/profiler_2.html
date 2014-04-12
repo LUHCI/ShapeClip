@@ -53,9 +53,9 @@
 				
 				// Correct ppi value.
 				var agent = navigator.userAgent.toLowerCase();
-				//if (agent.indexOf("windows")) 		{ }
-				if 		(agent.indexOf("nexus 5")) 	{ __ppi(445); }
-				else if (agent.indexOf("ipad")) 	{ __ppi(326); }
+				if 		(agent.indexOf("windows") 	!= -1) 	{ }
+				if 		(agent.indexOf("nexus 5") 	!= -1) 	{ __ppi(175); }
+				else if (agent.indexOf("ipad") 		!= -1) 	{ __ppi(163); }
 				console.log(navigator.userAgent.toLowerCase());
 				//$("#report").text(navigator.userAgent.toLowerCase());
 				
