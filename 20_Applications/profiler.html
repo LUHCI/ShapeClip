@@ -17,7 +17,7 @@
 		</style>
 		
 		<!-- Shape Clip -->
-		<script type="text/javascript" src="../10_Driver/ShapeClipAPI2.js"></script>
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
 		
 		<!-- JQuery -->
 		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
@@ -51,7 +51,7 @@
 						
 						var pad = null;
 						
-						pad = new ShapeClipFastComms({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						pad = new ShapeClipSerial({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
 						pad.rotate(180);

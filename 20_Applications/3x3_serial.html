@@ -47,7 +47,7 @@
 					{
 						var pX = 100 + (x * 27); // 29
 						var pY = 100 + (y * 34); // 33
-						var pad = new ShapeClipFastComms({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						var pad = new ShapeClipSerial({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
 						pad.rotate(180);

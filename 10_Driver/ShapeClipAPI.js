@@ -289,9 +289,9 @@ var Pad = Class.extend({
 
 
 /**
- * @brief The ShapeClipv1 is a Pad which can move the ShapeClip v1 up and down.
+ * @brief The ShapeClipv1 is a Pad which can move the ShapeClip using a sync-pulse.
  */
-var ShapeClipv1 = Pad.extend({
+var ShapeClip = Pad.extend({
 
 	// Signal Constants.
 	HIGH_IDX 	: 0,		// The index into the _signals array for the HIGH pulse.  This should always be 255 at index 0.
@@ -776,6 +776,448 @@ var ShapeClipHeight = Pad.extend({
 	 */
 	showRange: function(value) {
 		
+	},
+	
+});
+
+
+/**
+ * @brief The ShapeClipSerial is a Pad which controls the shape clip via serial-over-screen.
+ */
+var ShapeClipSerial = Pad.extend({
+
+	FORCE_REDRAW : true,	// Force a redraw after every pulse.
+	CENTER_SPLIT : true,	// Is there a black space between the two LDR signals?
+	PULSE_WIDTH :  60,		// The line state time for each bit.  Can run at 30 well enough. 
+	
+	PULSE_SPLIT : true,		// Do we want to split pulses that bring the line back to 0.  True is optimised, but slightly less reliable at fast pulse widths.
+	FRAME_PACK : false,		// Do we want to pack the start of each transmission frame with line 0.  Helps debug and reliability but slows down.
+	
+	
+	/**
+	 * @brief Construct this ShapeClipv1.
+	 * @param settings The dictionary of arguments.
+	 *      settings.width  	- The total width of the pad (px).
+	 *      settings.height 	- The total height of the pad (px).
+	 *      settings.x   		- The horizontal centre position of the pad from the top-left of the screen (px).
+	 *      settings.y   		- The vertical centre position of the pad from the top-left of the screen (px).
+	 *      settings.angle   	- The rotation applied to this pad in degrees.  0 degrees is the top of the screen.
+	 *      settings.parent     - The parent element within which to add the pad.
+	 *      settings.mouserot   - Is mouse rotation on scroll enabled. Boolean, true by default.
+	 *      settings.pulse      - Is the pulse enabled from the start.  Default = false.
+	 */
+	init : function(settings) {
+		
+		// Create the underlying pad.
+		this._super(settings);
+		
+		// Create an element for controlling LDR1
+		this._ldr1Element = document.createElement("div");
+		this._ldr1Element.classList.add("sc_control");
+		this._ldr1Element.style.position = "absolute";
+		this._ldr1Element.style.width  = this.CENTER_SPLIT ? "40%" : "50%";
+		this._ldr1Element.style.height = "100%";
+		this._ldr1Element.style.top    = "0px";
+		this._ldr1Element.style.left   = "0px";
+		this._ldr1Element.style["background-color"] = "white";
+		this._ldr1Element.style["pointer-events"] = "none";
+		this._element.appendChild(this._ldr1Element);
+		
+		// Create an element for controlling LDR1
+		this._ldr2Element = document.createElement("div");
+		this._ldr2Element.classList.add("sc_control");
+		this._ldr2Element.style.position = "absolute";
+		this._ldr2Element.style.width  = this.CENTER_SPLIT ? "40%" : "50%";
+		this._ldr2Element.style.height = "100%";
+		this._ldr2Element.style.top    = "0px";
+		this._ldr2Element.style.left   = this.CENTER_SPLIT ? "60%" : "50%";
+		this._ldr2Element.style["background-color"] = "black";
+		this._ldr2Element.style["pointer-events"] = "none";
+		this._element.appendChild(this._ldr2Element);
+		
+		// LDR values.
+		this._ldr1(0.0);
+		this._ldr2(0.0);
+		
+		// Signals control.
+		this._nextSignals = null;
+		this._nextSignalsCallback = null;
+		this._signals = [];
+		this._signalsCallback = null;
+		
+		this._signals = [];
+		this._signals = this._signals.concat( this._pack( 0xFF ) );
+		this._signals = this._signals.concat( this._pack( 0x55 ) );
+		this._signals = this._signals.concat( this._pack( 0x00 ) );
+		
+		/*
+		this._signals = this._signals.concat( this._pack("H".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0xff ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		
+		this._signals = this._signals.concat( this._pack("R".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0xff ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		
+		this._signals = this._signals.concat( this._pack("H".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0x00 ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		
+		this._signals = this._signals.concat( this._pack("R".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0x00 ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		
+		this._signals = this._signals.concat( this._pack("H".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 128 ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		*/
+		
+		
+		/*this._signals = this._signals.concat( this._pack("R".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0x7f ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		
+		this._signals = this._signals.concat( this._pack("G".charCodeAt(0) ) );
+		this._signals = this._signals.concat( this._pack( 0x00 ) );
+		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );*/
+		
+		//this._signals = this._signals.concat( this._pack( 0xff ) );
+		//this._signals = a.concat(b).concat(c);
+		
+		console.log( this._signals );
+		
+		// Pulsing values.
+		this._bStopPulse = false;
+		this._pLDR1PulseTmr = null;
+		this._jPulseStopped = null;
+		
+		// Begin pulsing.
+		if (settings.pulse || false)
+			this.pulse();
+	},
+	
+	/**
+	 * @brief Pack a value into an array of bytes for transmission to the ShapeClip.
+	 * See _packBytes and _bytes for details.
+	 * @param value The input unsigned 8 bit integer.
+	 * @return The packed array of transmission signals.
+	 */
+	_pack : function ( value ) {
+		return this._packBytes( this._bytes( value ) );
+	},
+	
+	/**
+	 * @brief Pack the bytes into an array of control signals for the LDR pads.
+	 * The ShapeClip can interpret these signals.
+	 * @param bytes The array of bytes to convert, e.g. [0,0,0,0, 1,1,1,1]
+	 * @return An array of 255, 128, and 0 values. 255 means line high. 128 means line zero, 0 means line low.
+	 */
+	_packBytes : function( bytes ) {
+		
+		// Outputs.
+		var packedframe = [];
+		var parity = false;
+		
+		// Pack the bit values from a frame.  Based on RS232.
+		// |----------|----------|----------|--------|--------|--------|--------|--------|--------|--------|--------|--------|-------\
+		// | SFRAME2  |  SFRAME  | STARTBIT |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  |  DATA  | PARITY |  EFRAME
+		// |----------|----------|----------|--------|--------|--------|--------|--------|--------|--------|--------|--------|---------\
+		
+		// Do we want to pack the start of each frame with 0 line.
+		if (this.FRAME_PACK)
+		{
+			packedframe.push( 128 );
+			packedframe.push( 128 );
+			packedframe.push( 128 );
+			packedframe.push( 128 );
+		}
+		
+		// Push the end, start, and start 2 bit.
+		packedframe.push(0)		// EFRAME
+		packedframe.push( 128 );
+		packedframe.push(255)	// SFRAME2
+		packedframe.push( 128 );
+		packedframe.push(0)		// SFRAME
+		
+		// Pack data.
+		var prevState = 0;
+		for( var i=0; i<bytes.length; i++ )
+		{
+			// Push the line to 0.
+			packedframe.push( 128 );
+			
+			// If we have a high byte, raise the line.
+			if( bytes[i] == 1 )
+			{
+				packedframe.push( 255 );
+				parity = !parity;
+			}
+			
+			// Otherwise bring it down.
+			else
+			{
+				packedframe.push( 0 );
+			}
+			
+			prevState = bytes[i];
+		}
+		
+		// Pack the parity bit and bring the line to 0 for the end of frame.
+		packedframe.push( 128 );
+		packedframe.push( parity ? 0 : 255 )	// PARITY
+		packedframe.push( 128 );
+		
+		return packedframe;
+	},
+	
+	/**
+	 * Convert an unsigned 8 bit binary value into an array of bytes.
+	 * @param value The value to convert. e.g. 0x0F
+	 * @return The array of bytes returned e.g. [ 0,0,0,0, 1,1,1,1 ]
+	 */
+	_bytes : function( value ) {
+		var sbits = parseInt(value).toString(2);
+		if (sbits.length > 8) throw "too many bits";
+		//if (sbits.length > 16) throw "too many bits";
+		if (sbits[0] == "-") throw "no negative values"
+		var len = sbits.length - 1;
+		function b(i) { return (sbits[len-i] == "1") ? 1 : 0; }
+		return [ b(7),b(6),b(5),b(4), b(3),b(2),b(1),b(0)  ];
+		//return [ b(15),b(14),b(13),b(12), b(11),b(10),b(9),b(8), b(7),b(6),b(5),b(4), b(3),b(2),b(1),b(0)  ];
+	},
+	
+	/**
+	 * @brief Delete this pad.
+	 */
+	remove : function() { 
+		
+		// Stop the timer.
+		this.stopPulse(function(){
+			this._super();
+		});
+		
+		// Remove it from the DOM.
+		this._super();
+	},
+	
+	/**
+	 * @brief Set/Get the value of LDR1 as a 0-1 percentage.
+	 * @param percent The value this LDR should transmit as a 0-1 percentage.
+	 * @return The percentage value of this LDR, or if parameters are passed, the pad itself. 
+	 */
+	_ldr1 : function(percent) {
+		
+		// If data is given, set it.
+		if (percent !== undefined)
+		{
+			if (percent < 0) percent = 0;
+			if (percent > 1) percent = 1;
+			this._fLDR1 = (percent * 100.0);
+			this._ldr1Element.style["background-color"] = "hsl(0,0%,"+this._fLDR1+"%)";
+			return this;
+		}
+		
+		// Otherwise return the value.
+		return (this._fLDR1 * 0.01);
+	},
+	
+	/**
+	 * @brief Set/Get the value of LDR1 as a 0-255 value.
+	 * @param percent The value this LDR should transmit as a 0-255 value.
+	 * @return The byte value of this LDR, or if parameters are passed, the pad itself. 
+	 */
+	_ldr1b : function(byte) {
+		if (byte !== undefined) { this._ldr1(byte / 255.0); return this; }
+		return parseInt(this._ldr1() * 255);
+	},
+	
+	/**
+	 * @brief Set/Get the value of LDR2 as a 0-1 percentage.
+	 * @param percent The value this LDR should transmit as a 0-1 percentage.
+	 * @return The percentage value of this LDR, or if parameters are passed, the pad itself. 
+	 */
+	_ldr2 : function(percent) {
+		// If data is given, set it.
+		if (percent !== undefined)
+		{
+			if (percent < 0) percent = 0;
+			if (percent > 1) percent = 1;					
+			this._fLDR2 = (percent * 100.0);
+			this._ldr2Element.style["background-color"] = "hsl(0,0%,"+this._fLDR2+"%)";
+			return this;
+		}
+		
+		// Otherwise return the value.
+		return (this._fLDR2 * 0.01);
+	},
+	
+	/**
+	 * @brief Set/Get the value of LDR2 as a 0-255 value.
+	 * @param percent The value this LDR should transmit as a 0-255 value.
+	 * @return The byte value of this LDR, or if parameters are passed, the pad itself. 
+	 */
+	_ldr2b : function(byte) {
+		if (byte !== undefined) { this._ldr2(byte / 255.0); return this; }
+		return parseInt(this._ldr2() * 255);
+	},
+	
+	/**
+	 * @brief Send a string of character commands to the ShapeClip.
+	 * @param lCommands A list of commands to send in sequence. e.g. ['r', 0xFF, 'h', 255];
+	 * @param jComplete A function which will be called when send has completed.
+	 */
+	send : function(lCommands, jComplete) {	
+		
+		// If we are going to override.
+		if (this._nextSignals != null)
+			throw "Cannot send signals while others are queued.";
+		
+		// For each item in the array, pack it and add it to the signals.
+		var packed = [];
+		for (var cmd = 0; cmd < lCommands.length; ++cmd)
+		{
+			if (typeof lCommands[cmd] == "string")
+				packed = packed.concat( this._pack( lCommands[cmd].charCodeAt(0) ) );
+			else if (typeof lCommands[cmd] == "number")
+				packed = packed.concat( this._pack( lCommands[cmd] ) );
+			else
+				throw "cannot pack things which are not strings or integers";
+		}
+		
+		// Add these to the queue.
+		this._nextSignalsCallback = jComplete || null;
+		this._nextSignals = packed;
+		
+		// Chaining.
+		return this;
+	},
+	
+	
+	/**
+	 * @brief Stop the pulsing by killing the signal.
+	 * If the pad is pulsing, this will incur a delay while the last pulse completes.  The jStopped callback will be called when it is stopped.
+	 * If the pad is not pulsing, this will call the jStopped callback immediately.
+	 * @jStopped A function to call when the pulsing stops. Optional.
+	 * @return This pad.
+	 */
+	stopPulse : function(jStopped) {
+		
+		// If we are not pulsing already, call immediately.
+		if (this._pLDR1PulseTmr == null)
+		{
+			// Clear values.
+			this._jPulseStopped = null;
+			this._bStopPulse = true;
+			
+			// Raise the stopped callback.
+			if (jStopped != null)
+				jStopped(this);
+		}
+		else
+		{
+			// Set up the values for so we can stop at the end of the pulse.
+			this._jPulseStopped = jStopped;
+			this._bStopPulse = true;
+		}
+		
+		// Return the pad.
+		return this;
+	},
+	
+	/**
+	 * @brief Begin the pulsing on LDR1 which transmits colour.
+	 */
+	pulse : function() {
+		
+		// Prevent it from already pulsing.
+		if (this._pLDR1PulseTmr != null)
+			throw "Pad is already pulsing";
+		
+		// Stick some variables on the stack.
+		var that 	= this;
+		var signal 	= 0;
+		
+		// Enable LDR1 pulse.
+		this._bStopPulse = false;
+		
+		// Define a loop function.
+		var loop;
+		loop = function() {
+			
+			// Update graphics (approx 4ms timer error "on my machine" TM)
+			var date = new Date();
+			var millis = date.getMilliseconds();
+			
+			// Create a carrier wave.
+			//var phase = 128 + Math.sin((millis/100)/Math.PI ) * 16;	// Modulating.
+			var phase = 128;											// Static.
+			
+			// Compute the diff-drive parameters for each LDR.
+			var ldr1tmp = (phase - ( that._signals[signal] - 128 )) / 2.0;
+			var ldr2tmp = (phase + ( that._signals[signal] - 128 )) / 2.0;
+			
+			// Push the values.
+			that._ldr1b( ldr1tmp );
+			that._ldr2b( ldr2tmp );
+			
+			// Force a redraw (or relayout) after every pulse.
+			if (that.FORCE_REDRAW) 
+			{
+				that._element.style.display = "none";
+				that._element.offsetHeight;
+				that._element.style.display = "block";
+			}
+			
+			// If we are on the last signal.
+			if (signal == that._signals.length - 1)
+			{
+				// Callback.
+				if (that._signalsCallback != null) 
+					that._signalsCallback(this);
+				
+				// Swap the signal to the next one IF there is one to swap it for.
+				if (that._nextSignals != null && that._nextSignals.length > 0)
+				{
+					that._signals = that._nextSignals;
+					that._signalsCallback = that._nextSignalsCallback;
+					that._nextSignals = null;
+					that._nextSignalsCallback = null;
+				}
+				
+			}
+			
+			// Increase signal and loop.
+			signal = ( signal + 1 ) % that._signals.length;
+			
+			// If we have a stop signal AND the next pulse is the first one, don't do it.
+			if (that._bStopPulse && signal != 0)
+			{
+				// Cleanup.
+				var jCallback = that._jPulseStopped;
+				that._jPulseStopped = null;
+				clearTimeout(that._pLDR1PulseTmr);
+				that._pLDR1PulseTmr = null;
+				
+				// Callback.
+				if (jCallback != null)
+					jCallback(that);
+				
+				return;
+			}
+			
+			// Pulse split optimisation on min-line signals.
+			if (ldr1tmp == 128 && ldr2tmp == 128 && that.PULSE_SPLIT == true)
+				that._pLDR1PulseTmr = setTimeout(loop, that.PULSE_WIDTH / 2.0);
+			
+			// Normal transmission period.
+			else
+				that._pLDR1PulseTmr = setTimeout(loop, that.PULSE_WIDTH);
+			
+		};
+		loop();
+		
+		// Return this pad.
+		return this;
 	},
 	
 });

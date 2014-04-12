@@ -6,6 +6,7 @@
 		JV - John Vidler
 		MS - Matthias Schitthelm
 	
+	v2.1 - JS - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
 	v2.0 - JH - Second version, re-factored and ready for UIST + profiling.
 	v1.6 - JV - Updated modes.
 	v1.5 - JV - Serial comms added.
@@ -23,9 +24,7 @@
 #include "CoolStepper.h" 
 #include "LDR.h"
 #include "Adafruit_NeoPixel.h"
-#include "RunningVariance.h"
 #include "WindowVariance.h"
-#include "Kalman.h"
 
 /* IO Pins */
 #define PIN_LED   A5		// The on-board LED.
@@ -63,8 +62,8 @@ const int SAMPLE_WINDOW = 90;								// The amount of time (ms) to sample the LD
 
 /** Sensor settings. */
 #define ON_SCREEN_TIMEIN 1000			// The amount of time before height mode accepts an on screen value. One second in ms.
-#define LDR_MIN_LIMIT 120				// The smallest acceptable delta between the min and max values of the LDR.
-#define LDR_MAX_LIMIT 1000				// The largest acceptable delta between the min and max values of the LDR.
+const int LDR_MIN_LIMIT = 120;				// The smallest acceptable delta between the min and max values of the LDR.
+const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the min and max values of the LDR.
 #define LDR_OFFSCREEN_DELTA_GAP 100 	// The largest gap between the LDR values at which it is considered off-screen.
 #define SSMODE_LDR_SYMB_LOWER -450		// The cap for the lowest LDR symbol.
 #define SSMODE_LDR_SYMB_UPPER 500		// The cap for the highest LDR symbol.
@@ -243,6 +242,7 @@ void zeroMotor() {
 	updateColour();
 }
 
+
 /**
  * @brief Move the motor one step towards the target position.
  */
@@ -255,13 +255,30 @@ void moveMotor() {
 	// Compute the distance to travel.
 	int iDelta = iTargetPos - iMotorPosition;
 	
-	// If we have to move over 1 step in either direction.
-	if (abs(iDelta) > 1)
+	// If we have to move over 2 steps in either direction.
+	if (abs(iDelta) > 2)
 	{
 		// Move one step in the correct direction and update the motor position.
 		int step = iDelta >= 0 ? 1 : -1;
-		motor.step(step);
-		iMotorPosition += step;
+		
+		// Skip for 20 steps.
+		if (abs(iDelta) > 20)
+		{
+			motor.step(step * 20);
+			iMotorPosition += (step * 20);
+		}
+		// Skip for 10 steps.
+		if (abs(iDelta) > 10)
+		{
+			motor.step(step * 10);
+			iMotorPosition += (step * 10);
+		}
+		// Detailed steps.
+		else
+		{
+			motor.step(step);
+			iMotorPosition += step;
+		}
 	}
 	
 	// Otherwise shut the motor down.
@@ -347,7 +364,7 @@ void setup() {
 	}
 
 	// Debug Mode
-	eClipMode = EEMODE_SERIAL;
+	eClipMode = EEMODE_SYNCPULSE;
 	eRGBMode  = RGBMODE_SCREEN;
 	detectModeChange( 1 );
 
@@ -566,6 +583,9 @@ int8_t checkPulse() {
  */
 void loopSyncPulseMode() {
 	
+	// Reset counter for the LDR2 limits.
+	static long iResetLimitsTime = -1;
+	
 	// Sync with the RGB pulse.
 	int8_t ePulseState = checkPulse();
 	
@@ -592,7 +612,8 @@ void loopSyncPulseMode() {
 		digitalWrite(PIN_LED, LOW);
 		
 		// No pulse - reset max and min for LDR2.
-		ldr2.resetLimits();
+		//ldr2.resetLimits();
+		iResetLimitsTime = millis();
 	}
 	
 	
@@ -600,27 +621,38 @@ void loopSyncPulseMode() {
 	if (bOnScreen)
 	{
 		// Update the target height.
-		uint16_t analogValue = ldr2.sample();
+		uint16_t iValue = ldr2.sample();
+		static WindowVariance* pSmooth = new WindowVariance(10);	// <-- the .sample() is way too noisy :(
+		pSmooth->push(iValue);
 		
 		// If we have enough range (i.e. our min max have not just been reset).
 		if (ldr2.limitsInRange(LDR_MIN_LIMIT, LDR_MAX_LIMIT))
 		{
 			// Move the motor in the direction of the target position.
-			iTargetPos = ldr2.mapMinMax(analogValue, 0, MOTOR_TRAVEL);
+			iTargetPos = ldr2.mapMinMax(pSmooth->mean(), 0, MOTOR_TRAVEL);
 			moveMotor();
+			
+			// Remove the limit reset counter value (we have good limits).
+			iResetLimitsTime = -1;
 		}
 		else
 		{
 			#ifdef SYNCPULSE_DEBUG
-			Serial.print("[SP] LDR2 limits outside expected range.");
-			Serial.println(analogValue);
+			Serial.print("[SP] LDR2 outside limits.");
+			Serial.println(iValue);
 			#endif
 		}
 	}
 	else
 	{
-		// Reset LDR2 min max.
-		ldr2.resetLimits();
+		// If we have not recovered a sync pulse 2s after we lost it, reset the ldr limits.
+		//  This buys us a little tolerance on the height channel against missing the odd sync-pulse.
+		//  Although height will not update without a sync pulse, we will only reset the limits if
+		//  we have missed a few in a row.
+		if ( (millis() - iResetLimitsTime) > 2000)
+		{
+			ldr2.resetLimits();
+		}
 	}
 	
 	static unsigned long tmrSample = 0;
@@ -673,7 +705,7 @@ void loopHeightMode() {
 	
 	// Run at 10hz.
 	static unsigned long tmrSample = 0;
-	if (cycleCheck(&tmrSample, 10U))
+	if (cycleCheck(&tmrSample, 5U))
 	{
 		// Push new data.
 		int iSample1 = ldr1.sample();
@@ -852,7 +884,7 @@ void loopSerialMode() {
 				bSerialBuffer = (bSerialBuffer << 1);
 				//bSerialBuffer = (bSerialBuffer << 1) & ~1;
 				#if (defined SSMODE_CMDPRINT || defined SSMODE_STREAMPRINT)
-				Serial.print( "0" );
+				Serial.print( "." );
 				#endif
 				break;
 			
@@ -860,7 +892,7 @@ void loopSerialMode() {
 			case SYMB_ZERO:
 				//inputIndex++;
 				#if (defined SSMODE_CMDPRINT || defined SSMODE_STREAMPRINT)
-				Serial.print( "" );
+				Serial.print( "~" );
 				#endif
 				break;
 			
@@ -868,7 +900,7 @@ void loopSerialMode() {
 			case SYMB_HIGH:
 				bSerialBuffer = (bSerialBuffer << 1) | 1;
 				#if (defined SSMODE_CMDPRINT || defined SSMODE_STREAMPRINT)
-				Serial.print( "1" );
+				Serial.print( "'" );
 				#endif
 				break;
 		}
@@ -889,16 +921,15 @@ void loopSerialMode() {
 		byte sFrame2    = (byte)((bSerialBuffer >> 12) & 0x01);	// Should = 1 = eFrame (they are the same bit)
 		#endif
 		
-		// 16-bit mode DOES NOT INCLUDE SFRAME2
-		/*
+		// 16-bit mode NOTE TESTED
 		#ifdef SSMODE_16BIT
-		byte eFrame     = (byte)(bSerialBuffer & 0x01);
-		byte parity     = (bSerialBuffer >> 1) & 0x01;
-		uint16_t frame  = (byte)((bSerialBuffer >> 2) & 0xFFFF);
-		byte startBit   = (bSerialBuffer >> 18) & 0x01;
-		byte sFrame     = (bSerialBuffer >> 19) & 0x01;
+		byte eFrame    = (byte)((bSerialBuffer >> 0) & 0x01);	// Should = 0
+		byte parity    = (byte)((bSerialBuffer >> 1) & 0x01);	// Should = 0 | 1
+		byte frame     = (byte)((bSerialBuffer >> 2) & 0xFF);	// Payload
+		byte startBit  = (byte)((bSerialBuffer >> 18) & 0x01);	// Should = 0
+		byte sFrame    = (byte)((bSerialBuffer >> 19) & 0x01);	// Should = 0
+		byte sFrame2    = (byte)((bSerialBuffer >> 20) & 0x01);	// Should = 1 = eFrame (they are the same bit)
 		#endif
-		*/
 		
 		// Check for valid frame... (see above).
 		byte data = frame;
@@ -909,11 +940,11 @@ void loopSerialMode() {
 			// Wipe the serial buffer ready for the next frame.
 			bSerialBuffer = 0;
 			
-			Serial.println(" <-- valid frame ");
-			Serial.print("  [");
-			Serial.print(data, BIN);
-			Serial.print("]  ");
-			Serial.println( data, HEX );
+			//Serial.println(" <-- valid frame ");
+			//Serial.print("  [");
+			//Serial.print(data, BIN);
+			//Serial.print("]  ");
+			//Serial.println( data, HEX );
 			
 			// Reset the number of bits seen.
 			bitsSeen = 0;
@@ -1004,6 +1035,7 @@ void loop() {
 	}
 	
 	// If we are in profiling mode.
+	/*
 	#ifdef MODE_PROFILING
 	
 	static bool bMeasuring = false;			// Are we measuring.
@@ -1050,7 +1082,7 @@ void loop() {
 		}
 	}
 	#endif
-	
+	*/
 }
 
 

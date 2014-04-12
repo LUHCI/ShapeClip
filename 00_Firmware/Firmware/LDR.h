@@ -50,7 +50,7 @@ class LDR
 	// Check to see if the LDR max and min fall within an expected range. min and max based on screen characteristics.
 	__inline__ boolean limitsInRange(uint16_t min, uint16_t max)
 	{ 
-		uint16_t iExtentDelta = abs(max - min);
+		int iExtentDelta = abs((int)this->max - (int)this->min);
 		return (iExtentDelta > min) && (iExtentDelta < max );
 	}
 	
