@@ -297,17 +297,14 @@ var FRAME = 0;
  */
 var ShapeClipFastComms = Pad.extend({
 
-	// Signal Constants.
-	HIGH_IDX 	: 0,		// The index into the _signals array for the HIGH pulse.  This should always be 255 at index 0.
-	LOW_IDX  	: 1,		// The index into the _signals array for the LOW pulse.  This should always be 0 at index 1.
-	RED_IDX  	: 2,		// The index into the _signals array for the RED pulse.  This should always be 0-255 at index 2.
-	GREEN_IDX  	: 3,		// The index into the _signals array for the GREEN pulse.  This should always be 0-255 at index 3.
-	BLUE_IDX  	: 4,		// The index into the _signals array for the BLUE pulse.  This should always be 0-255 at index 4.
-	
 	FORCE_REDRAW : true,	// Force a redraw after every pulse.
 	CENTER_SPLIT : true,	// Is there a black space between the two LDR signals?
-	PULSE_WIDTH :  40,		// The time the LDR has to sample each item in _signals. 200ms * 5 (for 5 pulses) is 1 RGB frame per second.
+	PULSE_WIDTH :  60,		// The time the LDR has to sample each item in _signals. 200ms * 5 (for 5 pulses) is 1 RGB frame per second.
 	TRAVEL_HEIGHT : 48.0,	// The number of mm that this ShapeClip unit can travel in mm.  (60mm screw length - 12mm flange height)
+	
+	PULSE_SPLIT : true,		// Do we want to split pulses that bring the line back to 0.  True is optimised, but slightly less reliable at fast pulse widths.
+	FRAME_PACK : false,			// Do we want to pack the start of each transmission frame with line 0.  Helps debug and reliability but slows down.
+	
 	
 	/**
 	 * @brief Construct this ShapeClipv1.
@@ -354,77 +351,18 @@ var ShapeClipFastComms = Pad.extend({
 		this._ldr1(0.0);
 		this._ldr2(0.0);
 		
-		this._fRed    = 0;
-		this._fGreen  = 0;
-		this._fBlue   = 0;
-		this._fHeight = 0;
-		
-		// RGB Signal Pattern.
-		//this._signals = [5, 0, 0, 0, 10, 0, 0, 0];
-		//this._signals = [255, 255, 255, 0, 0, 0, 0];
-		//this._signals = [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32];
-		//this._signals = [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-		//this._signals = [ 64 ];
-		//this._signals = [0, 255, 128+32, 128-32];
-		//this._signals = [0xC3, 0x0C, 0x70, 0x80];
-		//this._signals = [0xF0, 0x0F];
-		//this._signals = [0, 1, 2, 4, 8, 16, 32, 64, 128, 255, 255, 255, 255, 255, 255, 255];
-		/*this._signals = [];
-		for( var i=0; i<255; i++ )
-				this._signals.push( i );*/
-				
-		//this._signals = [ 255, 64, 32, 64, 128, 64, 255 ];
-		
-
-		
-		/*this._signals = [];
-		var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,0,  OP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,1,0,  EP,
-					  FRAME,1,  1,0,0,0,0,1,0,0,  EP,
-					  FRAME,1,  1,0,0,0,1,0,0,0,  EP,
-					  FRAME,1,  1,0,0,1,0,0,0,0,  EP,
-					  FRAME,1,  1,0,1,0,0,0,0,0,  EP,
-					  FRAME,1,  1,1,0,0,0,0,0,0,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,0,  OP,
-					  FRAME,1,  1,1,0,0,0,0,0,0,  EP,
-					  FRAME,1,  1,0,1,0,0,0,0,0,  EP,
-					  FRAME,1,  1,0,0,1,0,0,0,0,  EP,
-					  FRAME,1,  1,0,0,0,1,0,0,0,  EP,
-					  FRAME,1,  1,0,0,0,0,1,0,0,  EP,
-					  FRAME,1,  1,0,0,0,0,0,1,0,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  ];*/
-					  
-		/*var input = [ FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-					  FRAME,1,  1,0,0,0,0,0,0,1,  EP,
-					  ];*/
-		
-		/*for( var i=0; i<input.length; i++ )
-		{
-			this._signals.push( 128 );
-			if( input[i] == 1 )
-				this._signals.push( 255 );
-			else
-				this._signals.push( 0 );
-		}*/
-		
-		//this._signals = [0, 1, 2, 4, 8, 16, 32, 64, 128, 255, 255, 255, 255, 255, 255, 255];
-		
-		// Use the packer.
-		//var a = this._packBytes([0,0,0,0, 1,1,1,1]);
-		//var b = this._packBytes([1,1,1,1, 0,0,0,0]);
+		// Signals control.
+		this._nextSignals = null;
+		this._nextSignalsCallback = null;
 		this._signals = [];
-		//this._signals = this._signals.concat( this._pack( 0xff ) );
+		this._signalsCallback = null;
+		
+		this._signals = [];
+		this._signals = this._signals.concat( this._pack( 0xFF ) );
+		this._signals = this._signals.concat( this._pack( 0x55 ) );
+		this._signals = this._signals.concat( this._pack( 0x00 ) );
+		
+		/*
 		this._signals = this._signals.concat( this._pack("H".charCodeAt(0) ) );
 		this._signals = this._signals.concat( this._pack( 0xff ) );
 		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
@@ -444,6 +382,8 @@ var ShapeClipFastComms = Pad.extend({
 		this._signals = this._signals.concat( this._pack("H".charCodeAt(0) ) );
 		this._signals = this._signals.concat( this._pack( 128 ) );
 		this._signals = this._signals.concat( this._pack("X".charCodeAt(0) ) );
+		*/
+		
 		
 		/*this._signals = this._signals.concat( this._pack("R".charCodeAt(0) ) );
 		this._signals = this._signals.concat( this._pack( 0x7f ) );
@@ -468,48 +408,80 @@ var ShapeClipFastComms = Pad.extend({
 			this.pulse();
 	},
 	
+	/**
+	 * @brief Pack a value into an array of bytes for transmission to the ShapeClip.
+	 * See _packBytes and _bytes for details.
+	 * @param value The input unsigned 8 bit integer.
+	 * @return The packed array of transmission signals.
+	 */
 	_pack : function ( value ) {
 		return this._packBytes( this._bytes( value ) );
 	},
 	
+	/**
+	 * @brief Pack the bytes into an array of control signals for the LDR pads.
+	 * The ShapeClip can interpret these signals.
+	 * @param bytes The array of bytes to convert, e.g. [0,0,0,0, 1,1,1,1]
+	 * @return An array of 255, 128, and 0 values. 255 means line high. 128 means line zero, 0 means line low.
+	 */
 	_packBytes : function( bytes ) {
 		
+		// Outputs.
 		var packedframe = [];
 		var parity = false;
 		
-		//FRAME,1,  1,1,1,1,1,1,1,1,  EP,
-		//FRAME,1,  1,1,1,1,1,1,1,0,  OP,
+		// Do we want to pack the start of each frame with 0 line.
+		if (this.FRAME_PACK)
+		{
+			packedframe.push( 128 );
+			packedframe.push( 128 );
+			packedframe.push( 128 );
+			packedframe.push( 128 );
+		}
 		
+		// Push the end, start, and start 2 bit.
+		packedframe.push(0)		// EOF
+		packedframe.push( 128 );
 		packedframe.push(255)	// Frame Start
+		packedframe.push( 128 );
 		packedframe.push(0)		// Start Bit
 		
 		// Pack data.
 		var prevState = 0;
 		for( var i=0; i<bytes.length; i++ )
 		{
-			//if( bytes[i] == prevState )
-				packedframe.push( 128 );
+			// Push the line to 0.
+			packedframe.push( 128 );
 			
+			// If we have a high byte, raise the line.
 			if( bytes[i] == 1 )
 			{
-				packedframe.push( 0 );
+				packedframe.push( 255 );
 				parity = !parity;
 			}
+			
+			// Otherwise bring it down.
 			else
 			{
-				packedframe.push( 255 );
+				packedframe.push( 0 );
 			}
 			
 			prevState = bytes[i];
 		}
+		
+		// Pack the parity bit and bring the line to 0 for the end of frame.
 		packedframe.push( 128 );
-		packedframe.push( parity ? 255 : 0 )		// Party Bit
+		packedframe.push( parity ? 0 : 255 )		// Party Bit
 		packedframe.push( 128 );
-		//packedframe.push( parity ? EP : OP )		// Party Bit
 		
 		return packedframe;
 	},
 	
+	/**
+	 * Convert an unsigned 8 bit binary value into an array of bytes.
+	 * @param value The value to convert. e.g. 0x0F
+	 * @return The array of bytes returned e.g. [ 0,0,0,0, 1,1,1,1 ]
+	 */
 	_bytes : function( value ) {
 		var sbits = parseInt(value).toString(2);
 		if (sbits.length > 8) throw "too many bits";
@@ -520,9 +492,6 @@ var ShapeClipFastComms = Pad.extend({
 		return [ b(7),b(6),b(5),b(4), b(3),b(2),b(1),b(0)  ];
 		//return [ b(15),b(14),b(13),b(12), b(11),b(10),b(9),b(8), b(7),b(6),b(5),b(4), b(3),b(2),b(1),b(0)  ];
 	},
-	
-	
-	
 	
 	/**
 	 * @brief Delete this pad.
@@ -600,114 +569,36 @@ var ShapeClipFastComms = Pad.extend({
 	},
 	
 	/**
-	 * @brief Set/Get the red channel.
-	 * @param value The value in the red channel (0-255).  Optional, if missing the value is returned.
-	 * @return The value in the red channel, or if parameters are passed, the pad itself.
+	 * @brief Send a string of character commands to the ShapeClip.
+	 * @param lCommands A list of commands to send in sequence. e.g. ['r', 0xFF, 'h', 255];
+	 * @param jComplete A function which will be called when send has completed.
 	 */
-	r : function(value) {
-		if (value !== undefined)
-		{ 
-			this._fRed = value / 255.0;
-			return this;
+	send : function(lCommands, jComplete) {	
+		
+		// If we are going to override.
+		if (this._nextSignals != null)
+			throw "Cannot send signals while others are queued.";
+		
+		// For each item in the array, pack it and add it to the signals.
+		var packed = [];
+		for (var cmd = 0; cmd < lCommands.length; ++cmd)
+		{
+			if (typeof lCommands[cmd] == "string")
+				packed = packed.concat( this._pack( lCommands[cmd].charCodeAt(0) ) );
+			else if (typeof lCommands[cmd] == "number")
+				packed = packed.concat( this._pack( lCommands[cmd] ) );
+			else
+				throw "cannot pack things which are not strings or integers";
 		}
-		return parseInt(this._fRed * 255);
-	},
-	/**
-	 * @brief Set/Get the red channel.
-	 * @param value The value in the red channel (0-255).  Optional, if missing the value is returned.
-	 * @return The value in the red channel, or if parameters are passed, the pad itself.
-	 */
-	g : function(value) {
-		if (value !== undefined)
-		{ 
-			this._fGreen = value / 255.0;
-			return this;
-		}
-		return parseInt(this._fGreen * 255);
-	},
-	/**
-	 * @brief Set/Get the red channel.
-	 * @param value The value in the red channel (0-255).  Optional, if missing the value is returned.
-	 * @return The value in the red channel, or if parameters are passed, the pad itself.
-	 */
-	b : function(value) {
-		if (value !== undefined)
-		{ 
-			this._fBlue = value / 255.0;
-			return this;
-		}
-		return parseInt(this._fBlue * 255);
+		
+		// Add these to the queue.
+		this._nextSignalsCallback = jComplete || null;
+		this._nextSignals = packed;
+		
+		// Chaining.
+		return this;
 	},
 	
-	/**
-	 * @brief Set/Get the colour of the shape-clip device on this pad.
-	 * This will accept three parameters in order: r,g,b (0-255).
-	 * It will also accept a hex string, list or dictionary in the format: "#RRGGBB" | "#RGB" | [r,g,b] | { r:X,g:Y,b:Z } | { R:X, G:Y, B:Z }
-	 * @return The value of this colour as a RGB tuple [r,g,b], or if parameters are passed, the colour itself.
-	 */
-	colour : function(value) {
-		
-		// If no arguments, return the colour.
-		if (arguments.length == 0)
-		{
-			// Return as a triplet.
-			return [this.r(), this.g(), this.b()];
-		
-			// Get the colour as hex.
-			//function componentToHex(c) { var hex = c.toString(16); return hex.length == 1 ? "0" + hex : hex; }
-			//return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
-		}
-		
-		// If there is one argument, treat as array or dictionary.
-		if (arguments.length == 1)
-		{
-			// The args we will interpret.
-			var r = 0;
-			var g = 0;
-			var b = 0;
-			
-			// Convert hex into RGB. - http://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
-			function hexToRgb(hex) {
-				var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-				hex = hex.replace(shorthandRegex, function(m, r, g, b) { return r + r + g + g + b + b; });
-				var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-				return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-			}
-			
-			// Check for list or dictionaries and interpret results, allowing for: "#RRGGBB" | "#RGB" | [r,g,b] | { r:X,g:Y,b:Z } | { R:X, G:Y, B:Z }
-			var kValue = arguments[0];
-			if 		(typeof(kValue) === "string") { var colour = hexToRgb(kValue); r = colour.r; g = colour.g; b = colour.b; }
-			else if (kValue[0]   !== undefined && kValue[1]   !== undefined && kValue[2]   !== undefined) { r = kValue[0];   g = kValue[1];   b = kValue[2]	   	}
-			else if (kValue['r'] !== undefined && kValue['g'] !== undefined && kValue['b'] !== undefined) { r = kValue['r']; g = kValue['g']; b = kValue['b']	}
-			else if (kValue['R'] !== undefined && kValue['G'] !== undefined && kValue['B'] !== undefined) { r = kValue['R']; g = kValue['G']; b = kValue['B']	}
-			
-			// Load them into the signals table.
-			this.r(r);
-			this.g(g);
-			this.b(b);
-			
-			// Return the pad.
-			return this;
-		}
-		
-		// If there are three arguments, treat them as RGB.
-		else if (arguments.length == 3)
-		{
-			// Load them into the signals table.
-			this.r(parseInt(arguments[0]));
-			this.g(parseInt(arguments[1]));
-			this.b(parseInt(arguments[2]));
-			
-			// Return the pad.
-			return this;
-		}
-		
-		else
-		{
-			throw new Exception("Cannot interpret colour.");
-		}
-		
-	},
 	
 	/**
 	 * @brief Stop the pulsing by killing the signal.
@@ -753,11 +644,6 @@ var ShapeClipFastComms = Pad.extend({
 		var that 	= this;
 		var signal 	= 0;
 		
-		//Profiling code.
-		//var start = performance.now();
-		//var last = start;
-		//var id = this._id;
-		
 		// Enable LDR1 pulse.
 		this._bStopPulse = false;
 		
@@ -765,24 +651,21 @@ var ShapeClipFastComms = Pad.extend({
 		var loop;
 		loop = function() {
 			
-			// Profiling code.
-			// Let's log the time to measure the drawing load error.
-			//var curr = performance.now();
-			//lines.push("" + id + ","+(curr-last)+","+(curr-start));
-			//last = curr;
-			
 			// Update graphics (approx 4ms timer error "on my machine" TM)
 			var date = new Date();
 			var millis = date.getMilliseconds();
-			//var phase = 128 + Math.sin((millis/100)/Math.PI ) * 64;
-			var phase = 128;
+			
+			// Create a carrier wave.
+			//var phase = 128 + Math.sin((millis/100)/Math.PI ) * 16;	// Modulating.
+			var phase = 128;											// Static.
+			
+			// Compute the diff-drive parameters for each LDR.
 			var ldr1tmp = (phase - ( that._signals[signal] - 128 )) / 2.0;
 			var ldr2tmp = (phase + ( that._signals[signal] - 128 )) / 2.0;
 			
+			// Push the values.
 			that._ldr1b( ldr1tmp );
 			that._ldr2b( ldr2tmp );
-			//that._ldr1b( (that._signals[signal] & 0x0F) * 16 );
-			//that._ldr2b( (that._signals[signal] >> 4) * 16 );
 			
 			// Force a redraw (or relayout) after every pulse.
 			if (that.FORCE_REDRAW) 
@@ -790,6 +673,24 @@ var ShapeClipFastComms = Pad.extend({
 				that._element.style.display = "none";
 				that._element.offsetHeight;
 				that._element.style.display = "block";
+			}
+			
+			// If we are on the last signal.
+			if (signal == that._signals.length - 1)
+			{
+				// Callback.
+				if (that._signalsCallback != null) 
+					that._signalsCallback(this);
+				
+				// Swap the signal to the next one IF there is one to swap it for.
+				if (that._nextSignals != null && that._nextSignals.length > 0)
+				{
+					that._signals = that._nextSignals;
+					that._signalsCallback = that._nextSignalsCallback;
+					that._nextSignals = null;
+					that._nextSignalsCallback = null;
+				}
+				
 			}
 			
 			// Increase signal and loop.
@@ -811,9 +712,11 @@ var ShapeClipFastComms = Pad.extend({
 				return;
 			}
 			
-			// Otherwise, set the next pulse.
-			if (ldr1tmp == 128 && ldr2tmp == 128)
+			// Pulse split optimisation on min-line signals.
+			if (ldr1tmp == 128 && ldr2tmp == 128 && that.PULSE_SPLIT == true)
 				that._pLDR1PulseTmr = setTimeout(loop, that.PULSE_WIDTH / 2.0);
+			
+			// Normal transmission period.
 			else
 				that._pLDR1PulseTmr = setTimeout(loop, that.PULSE_WIDTH);
 			
