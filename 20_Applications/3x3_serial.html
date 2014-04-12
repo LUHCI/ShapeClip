@@ -17,7 +17,7 @@
 		</style>
 		
 		<!-- Shape Clip -->
-		<script type="text/javascript" src="../10_Driver/ShapeClipAPI2.js"></script>
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
 		
 		<!-- JQuery -->
 		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
@@ -55,13 +55,19 @@
 					}
 				}
 				
+				// Set them all to red.
+				//for(var i=0; i<pads.length;++i) pads[i].send(["R",0xFF,"X"])
+				
+				// Set them all to full height.
+				//for(var i=0; i<pads.length;++i) pads[i].send(["H",0xFF,"X"])
+				
 				// Start the pads all at once.
 				for (var i=0; i<pads.length; ++i) pads[i].pulse();
 				
 				// Configure the UI Slider.
 				document.getElementById("motorSlider").onchange = function(e){
-					var value = this.value * 0.01;
-					for (var i=0; i<pads.length; ++i) pads[i].height(value);
+					var value = (this.value * 0.01) * 255;
+					for(var i=0; i<pads.length;++i) pads[i].send(["H",value,"X"])
 				};
 				
 				// Configure the colour wheel.
@@ -70,7 +76,7 @@
 					var r = parseInt(colour.r);
 					var g = parseInt(colour.g);
 					var b = parseInt(colour.b);
-					for (var i=0; i<pads.length; ++i) pads[i].colour(r, g, b);
+					for(var i=0; i<pads.length;++i) pads[i].send(["R",r,"X",  "G",g,"X",  "B",b,"X"])
 				});
 				
 				

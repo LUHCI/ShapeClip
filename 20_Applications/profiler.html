@@ -29,6 +29,13 @@
 		
 		
 		<script type="text/javascript">
+		
+			average = function(a) {
+				var r = {mean: 0, variance: 0, deviation: 0}, t = a.length;
+				for(var m, s = 0, l = t; l--; s += a[l]);
+				for(m = r.mean = s / t, l = t, s = 0; l--; s += Math.pow(a[l] - m, 2));
+				return r.deviation = Math.sqrt(r.variance = s / t), r;
+			}
 			
 			var ws;
 			
@@ -51,17 +58,22 @@
 						
 						var pad = null;
 						
-						pad = new ShapeClipSerial({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						//pad = new ShapeClip({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
 						pad._id = "" + x + "x" + y;
 						pad.outline(true);
-						pad.rotate(180);
+						//pad.rotate(180);
+						
+						//pad.pulse();
+						pad.height(1.0);
+						//setTimeout(function(){pad.height(0.0)}, 2500);
 						
 						pads.push(pad);
 					}
 				}
 				
 				// Start the pads all at once.
-				for (var i=0; i<pads.length; ++i) pads[i].pulse();
+				//for (var i=0; i<pads.length; ++i) pads[i].pulse();
 				
 				// Configure the UI Slider.
 				document.getElementById("motorSlider").onchange = function(e){
@@ -69,6 +81,7 @@
 					for (var i=0; i<pads.length; ++i) pads[i].height(value);
 				};
 				
+				/*
 				// Configure the colour wheel.
 				var cw = Raphael.colorwheel($("#colourwheel")[0], 150);
 				cw.onchange(function(colour){
@@ -77,19 +90,95 @@
 					var b = parseInt(colour.b);
 					for (var i=0; i<pads.length; ++i) pads[i].colour(r, g, b);
 				});
+				*/
 				
-				
+
 				// Open a serial websocket to the ShapeClip.
 				ws = new WebSocket("ws://localhost:81/COM7/115200");
-				ws.onopen    = function() { console.log("OPEN"); };
-				ws.onclose   = function() { console.log("CLOSED"); };
-				ws.onmessage = function(e) {
-					console.log(e.data);
-				};
+				ws.onopen    = function() { console.log("COM7 OPEN");  nextPacket();/**/ };
+				ws.onclose   = function() { console.log("COM7 CLOSED"); };
+
+				// Send a ping.
 				
 				
+				//ws.send("i")
 			};
 			
+			var pingTime = 150;
+			
+			var activeSample = null;
+			var lSamplesOut = []
+			var lSamplesIn  = []
+			for (var i = 0; i < 255; i+=10)
+				lSamplesOut.push({ ack : false, expected : i, actual : [] }) // actual
+			
+			
+			function nextPacket(){
+				
+				// Say so.
+				activeSample = lSamplesOut.shift();
+				if (activeSample === undefined)
+				{
+					console.log("finished experiment ");
+					return;
+				}
+				console.log("starting packet: " + activeSample.expected);
+				
+				// Set value
+				for (var i=0; i<pads.length; ++i) pads[i].height(activeSample.expected / 255.0);
+				
+				// wait for it to be accepted
+				var iCount = 0;
+				var pTmr = null;
+				pTmr = setInterval(function(){
+					
+					// Log the actual value.
+					ws.onmessage = function(e) {
+						console.log("new data: " + e.data);
+						if (activeSample != null)
+						{
+							var tVals = e.data.split(",");
+							if (tVals.length != 7) {
+								console.log("bad packet");
+								return;
+							}
+							var targetMotor = (tVals[3] / 470.0) * 255;
+							//763770,0,23,21,0,0,0
+							//ms,frc,currheight,target height,r,g,b
+							activeSample.actual.push(targetMotor);
+						}
+					};
+					ws.send("i");
+					
+					// Do the next one.
+					if (iCount++ == 10)
+					{
+						// Compute deltas.
+						var deltas = [];
+						for (var i=0; i<activeSample.actual.length; ++i)
+							deltas.push(/*activeSample.expected - */activeSample.actual[i]);
+						var result = average(deltas);
+						activeSample.result = result;
+						
+						// Write it into the array.
+						console.log("finished packet: " + activeSample.expected);
+						clearInterval(pTmr);
+						lSamplesIn.push(activeSample);
+						activeSample = null;
+						setTimeout(function(){nextPacket();}, pingTime*2);
+					}
+						
+				}, pingTime);
+				
+				
+			}
+			
+			/*
+			for (var a=0; a< lSamplesIn.length; ++a)
+			{
+				console.log(lSamplesIn[a].expected + "," + lSamplesIn[a].result.mean + "," + lSamplesIn[a].result.variance)
+			}
+			*/
 			
 			
 			
@@ -101,6 +190,7 @@
 		<div id="colourwheel"></div>
 		<div id="controls">
 			<input id="motorSlider" type="range" value="0" min="0" max="100" />
+			<button id="btnBegin">Start Experiment</button>
 		</div>
 		<div id="sugar"><span>ShapeClip</span><span>v1</span></div>
 	</body>

@@ -78,7 +78,7 @@ const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the m
 //#define HEIGHT_DEBUG			// Height mode: Enable serial print of debug messages.
 //#define SYNCPULSE_DEBUG		// Sync pulse mode: Enable serial print of debug messages.
 //#define SSMODE_CMDPRINT		// Screen serial mode: Enable serial print of command buffer interpretations.
-#define SSMODE_STREAMPRINT	// Screen serial mode: Enable serial print of bitstream data for debugging the serial connection.
+//#define SSMODE_STREAMPRINT	// Screen serial mode: Enable serial print of bitstream data for debugging the serial connection.  <-- this one is cool
 
 //#define SERIAL_INFO			// Should device values be streamed via serial? csv: ms, ldr1, ldr2, rgb, height, frc, haspulse, swbot
 //#define SERIAL_SYNC_DEBUG		// Should sync pulse debug data be streamed via serial? csv: ms, r, g, b
@@ -166,7 +166,6 @@ int iTargetR = 0;					// Target RED component.
 int iTargetG = 0;					// Target GREEN component.
 int iTargetB = 0;					// Target BLUE component.
 int iTargetPos = 0;					// Target MOTOR height (steps).
-
 
 
 
@@ -364,8 +363,8 @@ void setup() {
 	}
 
 	// Debug Mode
-	eClipMode = EEMODE_SYNCPULSE;
-	eRGBMode  = RGBMODE_SCREEN;
+	//eClipMode = EEMODE_SYNCPULSE;
+	//eRGBMode  = RGBMODE_SCREEN;
 	detectModeChange( 1 );
 
 	// Wait for a random time so that not all clips zero their motor at the same time.
@@ -804,11 +803,6 @@ void loopHeightMode() {
  */
 void loopSerialMode() {
 	
-	
-	// Move the motor and update the colour.
-	moveMotor();
-	updateColour();
-	
 	// Static variables for the serial mode.
 	static bool flippedRead = false;						// Are we reading in "inverted" LDR mode (ie. LDR1 <> LDR2).
 	static unsigned int bitsSeen = 0;						// The number of valid bits read.
@@ -835,7 +829,7 @@ void loopSerialMode() {
 	
 	// Convert the LDR value into a symbol.
 	int state = SYMB_ZERO;
-	int thresh = 100;
+	int thresh = 100;	// 100 is a good value based on the LDR characteristics.
 	if      (iLDRValue[0] < (m-thresh) && iLDRValue[1] > (m+thresh)) state = SYMB_LOW;
 	else if (iLDRValue[1] < (m-thresh) && iLDRValue[0] > (m+thresh)) state = SYMB_HIGH;
 	
@@ -957,7 +951,7 @@ void loopSerialMode() {
 			Serial.print( data, HEX );
 			Serial.print( " " );
 			Serial.print( (char)data );
-			Serial.print( "]\t" );
+			Serial.print( "]\n" );
 			//Serial.println( bSerialBuffer, BIN ); //<-wiped
 			#endif
 			
@@ -998,7 +992,9 @@ void loopSerialMode() {
 		
 	}
 	
-
+	// Move the motor and update the colour.
+	moveMotor();
+	updateColour();
 }
 
 /**
@@ -1035,7 +1031,6 @@ void loop() {
 	}
 	
 	// If we are in profiling mode.
-	/*
 	#ifdef MODE_PROFILING
 	
 	static bool bMeasuring = false;			// Are we measuring.
@@ -1047,15 +1042,26 @@ void loop() {
 		byte data = Serial.read();
 		switch (data)
 		{
-			case 'p':
+			case 'p':	// PING / PONG
 				Serial.println("pong");
 				break;
-			case 's':
+			case 'i':	// INFORMATION
+				{
+					Serial.print(millis()); Serial.print(","); 				// ShapeClip time in ms.
+					Serial.print(analogRead(PIN_FORCE)); Serial.print(","); // Force reading.
+					Serial.print(iMotorPosition); Serial.print(","); 		// Current MOTOR HEIGHT.
+					Serial.print(iTargetPos); Serial.print(","); 			// Target MOTOR HEIGHT.
+					Serial.print(iTargetR); Serial.print(","); 				// Target RED
+					Serial.print(iTargetG); Serial.print(","); 				// Target GREEN
+					Serial.print(iTargetB); Serial.print("\n"); 			// Target BLUE.
+				}
+				break;
+			case 's':	// START STREAMING
 				Serial.print("start "); 
 				Serial.println(iMeasureCount);
 				bMeasuring = true;
 				break;
-			case 'f':
+			case 'f':	// FINISH STREAMING
 				Serial.print("stop ");
 				Serial.println(iMeasureCount);
 				bMeasuring = false;
@@ -1082,7 +1088,7 @@ void loop() {
 		}
 	}
 	#endif
-	*/
+	
 }
 
 
