@@ -322,11 +322,11 @@ void moveMotor() {
 	if ((millis() - shutdownTimeout) > 250)
 	{
 		// If we have not already shut the motor down.
-		if (bAllowMotorShutdown)
-		{
+		//if (bAllowMotorShutdown)
+		//{
 			motor.shutdown();
 			bAllowMotorShutdown = false;
-		}
+		//}
 	}
 	
 	
@@ -856,13 +856,16 @@ void loopHeightMode() {
 			// And reset the screen time.
 			iOnScreenTime = 0;
 			#ifdef HEIGHT_DEBUG
-			Serial.print("[HM] too small delta between LDRs");
+			Serial.print("[HM] too large delta between LDRs ");
 			Serial.println(iDelta);
 			#endif
 		}
 		
-		#ifdef HEIGHT_DEBUG // csv: on screen, min, max, value
+		#ifdef HEIGHT_DEBUG // csv: on screen, ldr1, ldr2, min, max, value
 		Serial.print(bOnScreen ? 100 : 0); Serial.print(",");	
+		Serial.print(iSample1); Serial.print(",");
+		Serial.print(iSample2); Serial.print(",");
+		
 		Serial.print(min); Serial.print(",");
 		Serial.print(max); Serial.print(",");
 		Serial.print(iMean); Serial.print("\n");
@@ -1149,6 +1152,9 @@ void loop() {
 				Serial.println(iMeasureCount);
 				bMeasuring = false;
 				iMeasureCount ++;
+				break;
+			case 'z':	// ZERO MOTOR
+				zeroMotor();
 				break;
 		}
 	}
