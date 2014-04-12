@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0,user-scalable=no" />
+		
+		<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>
+		<style>
+			document, body { background-color: black; color: white; position: fixed; width: 100%; height: 100%; margin: 0; } 
+			
+			.sc_pad {
+				background-color: black;
+			}
+			
+			#colourwheel { position: fixed; bottom: 100px; left: 100px; }
+			#controls { position: fixed; bottom: 50px; left: 100px;  }
+			#sugar { pointer-events: none; z-index: -99; position: fixed; bottom: 1cm; right: 1cm; color: #111; font-size: 5cm; font-family: 'Cabin', sans-serif; text-shadow: 1px 1px #222, -1px -1px #111}
+		</style>
+		
+		<!-- Shape Clip -->
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
+		
+		<!-- JQuery -->
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<!-- Colour Wheel -->
+		<script type="text/javascript" src="js/raphael-min.js"></script>
+		<script type="text/javascript" src="js/colorwheel.js"></script>
+		
+		
+		
+		<script type="text/javascript">
+			
+			/** Compute the mean, deviation, and variance of an array. Return an object. */
+			average = function(a) {
+				var r = {mean: 0, variance: 0, deviation: 0}, t = a.length;
+				for(var m, s = 0, l = t; l--; s += a[l]);
+				for(m = r.mean = s / t, l = t, s = 0; l--; s += Math.pow(a[l] - m, 2));
+				return r.deviation = Math.sqrt(r.variance = s / t), r;
+			}
+			
+			
+			
+			
+			var ws;
+			
+			var serial = null;	// The serial port (via web socket).
+			var pad = null; 	// The shape clip pad.
+			
+			$(document).ready(function(){
+				
+				// The size of the shape-clip pad in mm.
+				var SC_SIZE = __px(20);
+				
+				// 
+				
+				
+			});
+			
+			function start() {
+				
+
+				
+				
+				// Create a shape clip pad.
+				pad = new ShapeClipHeight({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+				
+				
+				// Create a large pad grid.
+				for (var x = 0; x < 3; ++x)
+				{
+					for (var y = 0; y < 3; ++y)
+					{
+						var pX = 100 + (x * 29); // 29
+						var pY = 100 + (y * 33); // 33
+						
+						var pad = null;
+						
+						
+						//pad = new ShapeClip({x: __px(pX), y: __px(pY), width: SC_SIZE, height: SC_SIZE});
+						pad._id = "" + x + "x" + y;
+						pad.outline(true);
+						//pad.rotate(180);
+						
+						pad.pulse();
+						pad.height(1.0);
+						//setTimeout(function(){pad.height(0.0)}, 2500);
+						
+						pads.push(pad);
+					}
+				}
+				
+				// Start the pads all at once.
+				//for (var i=0; i<pads.length; ++i) pads[i].pulse();
+				
+				// Configure the UI Slider.
+				document.getElementById("motorSlider").onchange = function(e){
+					var value = this.value * 0.01;
+					for (var i=0; i<pads.length; ++i) pads[i].height(value);
+				};
+				
+				/*
+				// Configure the colour wheel.
+				var cw = Raphael.colorwheel($("#colourwheel")[0], 150);
+				cw.onchange(function(colour){
+					var r = parseInt(colour.r);
+					var g = parseInt(colour.g);
+					var b = parseInt(colour.b);
+					for (var i=0; i<pads.length; ++i) pads[i].colour(r, g, b);
+				});
+				*/
+				
+
+				// Open a serial websocket to the ShapeClip.
+				ws = new WebSocket("ws://localhost:81/COM7/115200");
+				ws.onopen    = function() { console.log("COM7 OPEN");  nextPacket();/**/ };
+				ws.onclose   = function() { console.log("COM7 CLOSED"); };
+
+				// Send a ping.
+				
+				
+				//ws.send("i")
+			};
+			
+			var pingTime = 150;
+			
+			var activeSample = null;
+			var lSamplesOut = []
+			var lSamplesIn  = []
+			for (var i = 0; i < 255; i+=10)
+				lSamplesOut.push({ ack : false, expected : i, actual : [] }) // actual
+			
+			
+			function nextPacket(){
+				
+				// Say so.
+				activeSample = lSamplesOut.shift();
+				if (activeSample === undefined)
+				{
+					console.log("finished experiment ");
+					return;
+				}
+				console.log("starting packet: " + activeSample.expected);
+				
+				// Set value
+				for (var i=0; i<pads.length; ++i) pads[i].height(activeSample.expected / 255.0);
+				
+				// wait for it to be accepted
+				var iCount = 0;
+				var pTmr = null;
+				pTmr = setInterval(function(){
+					
+					// Log the actual value.
+					ws.onmessage = function(e) {
+						console.log("new data: " + e.data);
+						if (activeSample != null)
+						{
+							var tVals = e.data.split(",");
+							if (tVals.length != 7) {
+								console.log("bad packet");
+								return;
+							}
+							var targetMotor = (tVals[3] / 470.0) * 255;
+							//763770,0,23,21,0,0,0
+							//ms,frc,currheight,target height,r,g,b
+							activeSample.actual.push(targetMotor);
+						}
+					};
+					ws.send("i");
+					
+					// Do the next one.
+					if (iCount++ == 10)
+					{
+						// Compute deltas.
+						var deltas = [];
+						for (var i=0; i<activeSample.actual.length; ++i)
+							deltas.push(/*activeSample.expected - */activeSample.actual[i]);
+						var result = average(deltas);
+						activeSample.result = result;
+						
+						// Write it into the array.
+						console.log("finished packet: " + activeSample.expected);
+						clearInterval(pTmr);
+						lSamplesIn.push(activeSample);
+						activeSample = null;
+						setTimeout(function(){nextPacket();}, pingTime*2);
+					}
+						
+				}, pingTime);
+				
+				
+			}
+			
+			/*
+			for (var a=0; a< lSamplesIn.length; ++a)
+			{
+				console.log(lSamplesIn[a].expected + "," + lSamplesIn[a].result.mean + "," + lSamplesIn[a].result.variance)
+			}
+			*/
+			
+			
+			
+		</script>
+		
+	</head>
+	
+	<body onload="start()">
+		<div id="colourwheel"></div>
+		<div id="controls">
+			<input id="motorSlider" type="range" value="0" min="0" max="100" />
+			<button id="btnBegin">Start Experiment</button>
+		</div>
+		<div id="sugar"><span>ShapeClip</span><span>v1</span></div>
+	</body>
+	
+</html>
