@@ -22,6 +22,7 @@
 			#pulseProfile { position: absolute; left : 600px; top: 100px; width: 40%; height: 80%; background-color: white; color: black; text-align:center; }
 			.profilePage .loadingbar { position: relative; display: block; width: 80%; left: 10%; height: 32px; line-height:32px; background-color: #91F311; border-radius: 5px; border: 3px solid #1A1A1A; }
 			.export a { line-height: 32px; margin: 10px; padding: 5px; width: 100px; text-align: center; border: 1px solid; background-color: #BDE5F8; color: #00529B; }
+			#pulseColourSpace { width: 550px; }
 			
 			#colourwheel { position: fixed; bottom: 100px; left: 100px; }
 			#controls { position: fixed; bottom: 50px; left: 100px;  }
@@ -448,11 +449,12 @@
 							// Configure chart.
 							var options = {
 								title: 'RGB Colour Range Error',
-								pointSize : 5,
+								pointSize : 3,
 								crosshair: { trigger: 'both' },
 								width: 550, height: 550,
-								hAxis : { title: 'Sample Position', minValue : 0, maxValue : 255, gridlines :  { count: 255 / 30} },
-								vAxis : { title: 'Delta Error', minValue : 0, maxValue : 255, gridlines :  { count: 255 / 30} },
+								hAxis : { title: 'Sample Position', minValue : 0, maxValue : lSamples.length },
+								vAxis : { title: 'Delta Error', minValue : 0, maxValue : lSamples.length },
+								colors: ['red','green', 'blue'],
 							};
 						
 							var chart = new google.visualization.LineChart(document.getElementById('pulseChart'));
