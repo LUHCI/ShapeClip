@@ -351,8 +351,11 @@
 						var blue  = data[((imageWidth * y) + x) * 4 + 2];
 						var alpha = data[((imageWidth * y) + x) * 4 + 3];
 						
+						
 						lSamples.push({ expectedR : red, expectedG : green, expectedB : blue, actualR : [], actualG : [], actualB : [] })
 					}
+					console.log("SAMPLE EXPECTED");
+					console.log(lSamples);
 					lSamplesData = lSamples;
 					
 					var PULSEFRAMETIME = 100;// 200 * 5;
@@ -389,9 +392,9 @@
 								var lSummaryB = [];
 								for (var i=0; i<dRecord.actualR.length; ++i)
 								{
-									lSummaryR.push(dRecord.expected - dRecord.actualR[i]);
-									lSummaryG.push(dRecord.expected - dRecord.actualG[i]);
-									lSummaryB.push(dRecord.expected - dRecord.actualB[i]);
+									lSummaryR.push(dRecord.expectedR - dRecord.actualR[i]);
+									lSummaryG.push(dRecord.expectedG - dRecord.actualG[i]);
+									lSummaryB.push(dRecord.expectedB - dRecord.actualB[i]);
 								}
 								dRecord.resultR = average(lSummaryR);
 								dRecord.resultG = average(lSummaryG);
