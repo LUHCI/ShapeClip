@@ -392,9 +392,9 @@
 								var lSummaryB = [];
 								for (var i=0; i<dRecord.actualR.length; ++i)
 								{
-									lSummaryR.push(dRecord.expectedR - dRecord.actualR[i]);
-									lSummaryG.push(dRecord.expectedG - dRecord.actualG[i]);
-									lSummaryB.push(dRecord.expectedB - dRecord.actualB[i]);
+									lSummaryR.push(abs(dRecord.expectedR - dRecord.actualR[i]));
+									lSummaryG.push(abs(dRecord.expectedG - dRecord.actualG[i]));
+									lSummaryB.push(abs(dRecord.expectedB - dRecord.actualB[i]));
 								}
 								dRecord.resultR = average(lSummaryR);
 								dRecord.resultG = average(lSummaryG);
@@ -441,7 +441,7 @@
 							var data = [];
 							for (var i = 0; i < lSamples.length -1 ; ++i)
 							{
-								data.push([lSamples[i].expected, lSamples[i].resultR.mean, lSamples[i].resultG.mean, lSamples[i].resultB.mean]);
+								data.push([i, lSamples[i].resultR.mean, lSamples[i].resultG.mean, lSamples[i].resultB.mean]);
 							}
 							pTable.addRows(data);
 							
@@ -459,10 +459,10 @@
 							chart.draw(pTable, options);
 							
 							// Compute the downloadable content: CSV
-							var sCSVExport = "sampleidx,ar,ag,ab\n";
+							var sCSVExport = "sampleidx,ar,ag,ab,er,eg,eb\n";
 							for (var i=0; i<lSamples.length; ++i)
 							{
-								sCSVExport += lSamples[i].expected +","+ lSamples[i].resultR.mean +","+ lSamples[i].resultG.mean +","+ lSamples[i].resultB.mean +"\n";
+								sCSVExport += i +","+ lSamples[i].resultR.mean +","+ lSamples[i].resultG.mean +","+ lSamples[i].resultB.mean +","+ lSamples[i].expectedR +","+ lSamples[i].expectedG +","+ lSamples[i].expectedB +"\n";
 							}
 							
 							// Add the export and apply buttons.
@@ -490,7 +490,7 @@
 							lSamples[sample].actualR.push(actualR);
 							lSamples[sample].actualG.push(actualG);
 							lSamples[sample].actualB.push(actualB);
-							console.log(actualR + " , " +actualG + " , " +actualB + " , ");
+							console.log(actualR + " , " +actualG + " , " +actualB);
 							
 							//console.log("good packet: " + e.data);
 							// Say we are ready for the next one.
