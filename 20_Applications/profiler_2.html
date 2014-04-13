@@ -57,6 +57,7 @@
 			
 			
 			var ws;
+			var lSamplesData = [];
 			
 			var serial = null;	// The serial port (via web socket).
 			var syncpulse_pad = null; 	// The shape clip pad.
@@ -352,7 +353,7 @@
 						
 						lSamples.push({ expectedR : red, expectedG : green, expectedB : blue, actualR : [], actualG : [], actualB : [] })
 					}
-					
+					lSamplesData = lSamples;
 					
 					var PULSEFRAMETIME = 100;// 200 * 5;
 					
