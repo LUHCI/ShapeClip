@@ -484,12 +484,13 @@
 							// Record the data: ms,frc,currheight,target height,r,g,b
 							iGoodPackets += 1;
 							// var actualHeight = (tVals[3] / 470.0) * 255;
-							var actualR = tVals[4];
-							var actualG = tVals[5];
-							var actualB = tVals[6];
+							var actualR = parseInt(tVals[4]);
+							var actualG = parseInt(tVals[5]);
+							var actualB = parseInt(tVals[6]);
 							lSamples[sample].actualR.push(actualR);
 							lSamples[sample].actualG.push(actualG);
 							lSamples[sample].actualB.push(actualB);
+							console.log(actualR + " , " +actualG + " , " +actualB + " , ");
 							
 							//console.log("good packet: " + e.data);
 							// Say we are ready for the next one.
