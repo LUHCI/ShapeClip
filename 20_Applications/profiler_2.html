@@ -8,11 +8,20 @@
 		
 		<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>
 		<style>
-			document, body { background-color: black; color: white; position: fixed; width: 100%; height: 100%; margin: 0; } 
+			document, body {  font-family: 'Cabin', sans-serif; background-color: black; color: white; position: fixed; width: 100%; height: 100%; margin: 0; } 
 			
 			.sc_pad {
 				background-color: black;
 			}
+			
+			.profileButton { position: absolute; line-height: 32px; padding: 5px; width: 160px; text-align: center; border: 1px solid; background-color: #BDE5F8; color: #00529B; }
+			.profileButton:hover { background-color: #D2EBF7;  } 
+			.profileButton:active { background-color: #90D5F4;  } 
+			
+			#heightProfile { position: absolute; left : 600px; top: 100px; width: 40%; height: 80%; background-color: white; color: black; text-align:center; }
+			#pulseProfile { position: absolute; left : 600px; top: 100px; width: 40%; height: 80%; background-color: white; color: black; text-align:center; }
+			.profilePage .loadingbar { position: relative; display: block; width: 80%; left: 10%; height: 32px; line-height:32px; background-color: #91F311; border-radius: 5px; border: 3px solid #1A1A1A; }
+			
 			
 			#colourwheel { position: fixed; bottom: 100px; left: 100px; }
 			#controls { position: fixed; bottom: 50px; left: 100px;  }
@@ -29,7 +38,7 @@
 		<script type="text/javascript" src="js/raphael-min.js"></script>
 		<script type="text/javascript" src="js/colorwheel.js"></script>
 		
-		
+		<script type="text/javascript" src="https://www.google.com/jsapi"></script>
 		
 		<script type="text/javascript">
 			
@@ -48,6 +57,7 @@
 			
 			var serial = null;	// The serial port (via web socket).
 			var syncpulse_pad = null; 	// The shape clip pad.
+			google.load("visualization", "1", {packages:["corechart"]});
 			
 			$(document).ready(function(){
 				
@@ -73,10 +83,220 @@
 				syncpulse_pad.height(1.0);
 				
 				// Add a new button to start profiling.
-				$("<div>").text("profile clip")
+				var body = $("body");
+				var pHeightBtn = $("<div>").text("Profile Height Mode")
+					.addClass("profileButton height")
+					.css("top",height_pad.position().y - 15)
+					.css("left",height_pad.position().x + 100)
+					.appendTo(body);
+				var pPulseBtn = $("<div>").text("Profile Pulse Mode")
+					.addClass("profileButton syncpulse")
+					.css("top",syncpulse_pad.position().y - 15)
+					.css("left",syncpulse_pad.position().x + 100)
+					.appendTo(body);
 				
+				// Hook up the buttons.
+				pHeightBtn.click(function() {
+					
+					// Show the height mode.
+					$("#pulseProfile").fadeOut();
+					$("#heightProfile").fadeIn();
+					
+					// Helpers for sending messages.
+					function barError(message) { barMessage("#heightProfile", message, "error"); }
+					function barTalk(message) { barMessage("#heightProfile", message, "message"); }
+					
+					// Generate sample receivers.
+					var lSamples = []
+					for (var i = 0; i < 255; i+=5)
+						lSamples.push({ expected : i, actual : [] })
+					
+					//var bFinished = false;
+					
+					function profileHeight() {
+						
+						var sample = -1;				// sample index
+						var total  = lSamples.length;	// number of samples
+						var sampleRecords = 10;			// number of records to take per sample
+						
+						var iBadPackets = 0;
+						var iGoodPackets = 0;
+						
+						function requestNextRecord() {
+							height_pad.height(lSamples[sample].expected / 255.0);
+							//serial.send("i");
+							setTimeout(function() { serial.send("i"); }, 100);
+						};
+						
+						function requestNextSample() {
+							
+							console.log("new sample " + sample);
+							// Summary for the current one (just ending).
+							if (sample > -1)
+							{
+								//var dRecord = lSamples[sample];
+								//var lSummary = [];
+								//for (var i=0; i<dRecord.actual.length; ++i)
+								//	lSummary.push(/*dRecord.expected - */dRecord.actual[i]);
+								//dRecord["result"] = average(lSummary);
+								//console.log("average for sample " + sample + " is ");
+								//console.log(dRecord.result);
+								lSamples[sample].result = average(lSamples[sample].actual);
+							}
+							
+							// Increment the sample counter.
+							sample += 1;
+							barMessage("#heightProfile", sample / lSamples.length * 100);
+							
+							// Kick off the next one.
+							if (sample == lSamples.length)
+							{
+								finishedExperiment();
+							}
+							else
+							{
+								requestNextRecord();
+							}
+						};
+						
+						function finishedExperiment() {
+							
+							barTalk("Profiling Complete.");
+							
+							// Close serial.
+							serial.close();
+							
+							// Prep data for chart.
+							// https://developers.google.com/chart/interactive/docs/gallery/linechart
+							var data = [];
+							data.push(["Expected", "Actual"]);
+							for (var i = 0; i < lSamples.length -1 ; ++i)
+							{
+								var d = lSamples[i];
+								data.push([d.expected, d.result.mean])
+							}
+							
+							// Draw chart.
+							var data = google.visualization.arrayToDataTable(data);
+							var options = {
+							  title: 'LDR Expected vs Actual Error',
+							 // height: 500,
+							};
+							var chart = new google.visualization.LineChart(document.getElementById('heightChart'));
+							chart.draw(data, options);
+							
+						};
+						
+						serial.onmessage = function(e) {
+							
+							// Pull out data.
+							var tVals = e.data.split(",");
+							if (tVals.length != 7) {
+								iBadPackets += 1;
+								console.log("bad packet: " + e.data);
+								requestNextRecord();
+								return;
+							}
+							
+							// Record the data: ms,frc,currheight,target height,r,g,b
+							iGoodPackets += 1;
+							var actualHeight = (tVals[3] / 470.0) * 255;
+							lSamples[sample].actual.push(actualHeight);
+							console.log("good packet: " + e.data);
+							// Say we are ready for the next one.
+							if (iGoodPackets < sampleRecords)
+							{
+								requestNextRecord();
+							}
+							
+							// Otherwise, move to the next sample.
+							else
+							{
+								requestNextSample();
+								iGoodPackets = 0;
+								iBadPackets = 0;
+							}
+						};
+						
+						// Kick it off.
+						requestNextSample();
+						
+						/*
+						var count = 0;
+						var tmr = null;
+						tmr = setInterval(function(){
+							console.log("timer  "+ count);
+							barMessage("#heightProfile", count++)
+							if (count == 100)
+							{
+								clearInterval(tmr);
+								barTalk("Profiling complete");
+								serial.close();
+								bFinished = true;
+							}
+						}, 100)
+						*/
+						
+					}
+					
+					// Connect to the clip.
+					barTalk("Connecting to clip on COM7");
+					serial  = new WebSocket("ws://localhost:81/COM7/115200");
+					serial.onopen    = function() { console.log("COM7 OPEN");  barTalk("Connected"); setTimeout(profileHeight, 1000); };
+					serial.onclose   = function() { console.log("COM7 CLOSED"); if (!bFinished) { barError("COM7 closed. Check for errors?") } };
+					serial.onerror   = function() { console.log("COM7 CLOSED"); if (!bFinished) { barError("COM7 closed. Check for errors?") } };
+					
+					
+				});
+				
+				// Create the charts.
+				
+				//google.setOnLoadCallback(drawChart);
+			
 				
 			});
+			
+			function barMessage(el, sText, sState) {
+				var bar = $(el).find(".loadingbar");
+				sState = sState || "progress";
+				if (sState == "message")
+				{
+					bar.text(sText);
+					bar.css("background", "#F7C21D");
+				}
+				else if (sState == "error")
+				{
+					bar.text(sText);
+					bar.css("background", "#F0230E");
+				}
+				else if (sState == "progress")
+				{
+					var dp = Math.round((parseInt(sText)) * 100) / 100;
+					bar.text(dp + "%");
+					bar.css("background", "-webkit-gradient(linear, left top, right top, color-stop("+dp+"%,#A1F618), color-stop("+dp+"%,#1A1A1A), color-stop("+dp+"%,#1A1A1A))");
+				}
+				else
+				{
+					throw "dont know how to interpret this message";
+				}
+			}
+			
+			function drawChart() {
+				var data = google.visualization.arrayToDataTable([
+				  ['Year', 'Sales', 'Expenses'],
+				  ['2004',  1000,      400],
+				  ['2005',  1170,      460],
+				  ['2006',  660,       1120],
+				  ['2007',  1030,      540]
+				]);
+			
+				var options = {
+				  title: 'Company Performance'
+				};
+			
+				var chart = new google.visualization.LineChart(document.getElementById('heightProfile'));
+				chart.draw(data, options);
+			}
 			
 			function start() {
 				
@@ -232,6 +452,10 @@
 			<button id="btnBegin">Start Experiment</button>
 			<span id="report"></span>
 		</div>
+		
+		<div id="heightProfile" class="profilePage"><h1>Height Profile</h1><div class="loadingbar">0%</div><div id="heightChart" class="chart"></div></div>
+		<div id="pulseProfile" class="profilePage"><h1>Pulse Profile</h1><div class="loadingbar">0%</div><div id="pulseChart" class="chart"></div></div>
+		
 		<div id="sugar"><span>ShapeClip</span><span></span></div>
 	</body>
 	

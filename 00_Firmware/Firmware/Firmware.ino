@@ -77,7 +77,7 @@ const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the m
 //#define SSMODE_16BIT			// Run screen-serial in 16 bit mode (not recommended or tested that much).
 
 /* Serial Debugging modes. */
-//#define HEIGHT_DEBUG			// Height mode: Enable serial print of debug messages.
+#define HEIGHT_DEBUG			// Height mode: Enable serial print of debug messages.
 //#define SYNCPULSE_DEBUG		// Sync pulse mode: Enable serial print of debug messages.
 //#define SSMODE_CMDPRINT		// Screen serial mode: Enable serial print of command buffer interpretations.
 //#define SSMODE_STREAMPRINT	// Screen serial mode: Enable serial print of bitstream data for debugging the serial connection.  <-- this one is cool

@@ -35,11 +35,18 @@
 			var hpads = [];
 			
 			function start() {
+			
+				// Correct ppi value.
+				var agent = navigator.userAgent.toLowerCase();
+				if 		(agent.indexOf("windows") 	!= -1) 	{ }
+				if 		(agent.indexOf("nexus 5") 	!= -1) 	{ __ppi(150); }
+				else if (agent.indexOf("ipad") 		!= -1) 	{ __ppi(160); }
+				console.log("User Agent: " + navigator.userAgent.toLowerCase());
 				
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
-				var X = 100;
-				var Y = 95;
+				var X = 50;
+				var Y = 40;
 				
 				// Create a large pad grid.
 				for (var x = 0; x < 3; ++x)
