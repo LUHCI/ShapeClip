@@ -5,7 +5,8 @@
 		CW - Christian Weichel
 		JV - John Vidler
 		MS - Matthias Schitthelm
-	
+
+	v2.4 - JV - Moved serial buffer updates to a seperate call, serial now updated regardless of mode.	
 	v2.3 - JH - Fixes to serial RGB colour display.
 	v2.2 - JH - Motor driver accumulator. Known bug which does not let it drive to the extents.
 	v2.1 - JH - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
@@ -17,6 +18,27 @@
 	v1.2 - CW - Added LDR.h and LDR.cpp
 	v1.1 - CW + MS - Added cool stepper.
 	v1.0 - JH - First version, sync-pulse based control of RGB and Height
+
+
+	/------------------------\
+	| SCREEN SERIAL COMMANDS |
+ 	\------------------------/
+        
+        Format: [Command][Parameter][X]
+        Each part is a single byte, and the last byte should always be ASCII 'X'.
+        
+        When in serial mode:
+        [R][0-255][X] - Set red value
+        [G][0-255][X] - Set green value
+        [B][0-255][X] - Set blue value
+        [H][0-255][X] - Set height value
+        
+        When in any mode:
+        [M][H][X] - Change to height mode
+        [M][Y][X] - Change to syncpulse mode
+        [M][S][X] - Change to serial command mode.
+        
+        
 */
 
 /* External and 3rd party libraries. */ 
@@ -1117,9 +1139,14 @@ void loop() {
 
 	// Attempt to read a serial bit from the screen.
 	screenSerialRead();
-	if( cmdBuffer[2] == 'X' )
+	if( cmdBuffer[2] == 'M' && cmdBuffer[2] == 'X' )
 	{
 		switch( cmdBuffer[1] )
+		{
+			case 'H': detectAndSetModeChange( EEMODE_HEIGHTONLY ); break;
+			case 'Y': detectAndSetModeChange( EEMODE_SYNCPULSE ); break;
+			case 'S': detectAndSetModeChange( EEMODE_SERIAL ); break;
+		}
 	}
 	
 	// Detect which mode we are in.
