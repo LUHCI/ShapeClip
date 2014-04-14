@@ -40,6 +40,7 @@
         [G][0-255][X] - Set green value
         [B][0-255][X] - Set blue value
         [H][0-255][X] - Set height value
+        [Z][any][X]   - Zero the actuator
         
         When in any mode:
         [M][H][X] - Change to height mode
@@ -1117,10 +1118,31 @@ void screenSerialRead() {
 	}
 }
 
+#define SERIAL_WATCH_ERRORS
+
 void loopSerialMode()
 {
 	screenSerialRead();
-	
+
+        #ifdef SERIAL_WATCH_ERRORS
+        static byte lastValue = 0;
+        if( cmdBuffer[0] == 0 )
+          lastValue = 0;
+        
+        if( cmdBuffer[0] > lastValue )
+        {
+          if( cmdBuffer[0] != lastValue+1 )
+            Serial.print( "Err," );
+          else
+            Serial.print( "Ok," );
+          Serial.println( cmdBuffer[0] );
+          
+          lastValue = cmdBuffer[0];
+        }
+        
+        
+        #else
+        
 	if( cmdBuffer[2] == 'X' )
 	{
 		switch( cmdBuffer[0] )
@@ -1129,13 +1151,14 @@ void loopSerialMode()
 			case 'G': iTargetG = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
 			case 'B': iTargetB = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
 			case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
-			case 'z': zeroMotor(); break;
+			case 'Z': zeroMotor(); break;
 		}
 	}
 	
 	// Move the motor and update the colour.
 	moveMotor();
 	updateColour();
+        #endif
 }
 
 /**
