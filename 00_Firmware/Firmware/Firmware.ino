@@ -6,6 +6,10 @@
 		JV - John Vidler
 		MS - Matthias Schitthelm
 	
+	
+	TODO: BF - Height mode does not like LDR1 and LDR2 sensing different things -- should average them.
+	           Currently used as an "on screen" check.
+	
 	v2.3 - JH - Fixes to serial RGB colour display.
 	v2.2 - JH - Motor driver accumulator. Known bug which does not let it drive to the extents.
 	v2.1 - JH - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
@@ -77,11 +81,11 @@ const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the m
 //#define SSMODE_16BIT			// Run screen-serial in 16 bit mode (not recommended or tested that much).
 
 /* Serial Debugging modes. */
-#define HEIGHT_DEBUG			// Height mode: Enable serial print of debug messages.
+//#define HEIGHT_DEBUG			// Height mode: Enable serial print of debug messages.
 //#define SYNCPULSE_DEBUG		// Sync pulse mode: Enable serial print of debug messages.
 //#define SSMODE_CMDPRINT		// Screen serial mode: Enable serial print of command buffer interpretations.
 //#define SSMODE_STREAMPRINT	// Screen serial mode: Enable serial print of bitstream data for debugging the serial connection.  <-- this one is cool
-
+//#define SSMODE_TRANSMISSION_GRAPH // Print out the data for the screen-serial transmission graph.
 //#define SERIAL_INFO			// Should device values be streamed via serial? csv: ms, ldr1, ldr2, rgb, height, frc, haspulse, swbot
 //#define SERIAL_SYNC_DEBUG		// Should sync pulse debug data be streamed via serial? csv: ms, r, g, b
 //#define SERIAL_SYNC_DEBUG2	// Should the verbose sync pulse debug data be streamed via serial? csv: ms, slope, max, r, g, b, min, raw
@@ -924,9 +928,12 @@ void loopSerialMode() {
 	else if (iLDRValue[1] < (m-thresh) && iLDRValue[0] > (m+thresh)) state = SYMB_HIGH;
 	
 	/* Create the state transition graph.  Can be used to count bits - very useful for debugging serial line.
+	*/
+	#ifdef SSMODE_TRANSMISSION_GRAPH
 	static unsigned long tmr1 = 0;
 	if (cycleCheck(&tmr1, 10U))
 	{
+		Serial.print(millis()); Serial.print(",");
 		Serial.print(m); Serial.print(",");
 		Serial.print(m-100); Serial.print(",");
 		Serial.print(m+100); Serial.print(",");
@@ -934,7 +941,7 @@ void loopSerialMode() {
 		Serial.print(iLDRValue[1]); Serial.print(",");
 		Serial.print((state * 100) - 100); Serial.print("\n");
 	}
-	*/
+	#endif SSMODE_TRANSMISSION_GRAPH
 	
 	// If we are possibly inverted, invert the values!
 	if( flippedRead )
