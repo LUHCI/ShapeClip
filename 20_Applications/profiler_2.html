@@ -359,14 +359,14 @@
 					console.log(lSamples);
 					lSamplesData = lSamples;
 					
-					var PULSEFRAMETIME = 200 * 5; // 100
+					var PULSEFRAMETIME = 2000; // 200 * 5; // 100
 					
 					function profilePulse()
 					{
 						
 						var sample = -1;				// sample index
 						var total  = lSamples.length;	// number of samples
-						var sampleRecords = 10;			// number of records to take per sample
+						var sampleRecords = 60;			// number of records to take per sample
 						
 						var iBadPackets = 0;
 						var iGoodPackets = 0;
