@@ -883,8 +883,8 @@ var ShapeClipSerial = Pad.extend({
 		
 		this._signals = [];
 		this._signals = this._signals.concat( this._pack( 0xFF ) );
-		this._signals = this._signals.concat( this._pack( 0x55 ) );
-		this._signals = this._signals.concat( this._pack( 0x00 ) );
+		//this._signals = this._signals.concat( this._pack( 0x55 ) );
+		//this._signals = this._signals.concat( this._pack( 0x00 ) );
 		
 		/*
 		this._signals = this._signals.concat( this._pack("H".charCodeAt(0) ) );
@@ -1105,8 +1105,8 @@ var ShapeClipSerial = Pad.extend({
 	send : function(lCommands, jComplete) {	
 		
 		// If we are going to override.
-		if (this._nextSignals != null)
-			throw "Cannot send signals while others are queued.";
+		//if (this._nextSignals != null)
+			//throw "Cannot send signals while others are queued.";
 		
 		// For each item in the array, pack it and add it to the signals.
 		var packed = [];

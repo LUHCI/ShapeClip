@@ -5,16 +5,11 @@
 		CW - Christian Weichel
 		JV - John Vidler
 		MS - Matthias Schitthelm
-<<<<<<< HEAD
-	
 	
 	TODO: BF - Height mode does not like LDR1 and LDR2 sensing different things -- should average them.
 	           Currently used as an "on screen" check.
-	
-=======
-
+			   
 	v2.4 - JV - Moved serial buffer updates to a seperate call, serial now updated regardless of mode.	
->>>>>>> b4fa65bf6fb039913b457da4653c401272020555
 	v2.3 - JH - Fixes to serial RGB colour display.
 	v2.2 - JH - Motor driver accumulator. Known bug which does not let it drive to the extents.
 	v2.1 - JH - Bug fixes to the 2.0, added stepper optimisation, decrunchified sync-pulse mode.
@@ -563,12 +558,15 @@ void detectAndSetModeChange( int skipToMode ) {
 		switch( eClipMode )
 		{
 			case EEMODE_HEIGHTONLY:
+				Serial.println( "HEIGHT" );
 				pRGB.setPixelColor(0,  255, 0, 0);
 				break;
 			case EEMODE_SYNCPULSE:
+				Serial.println( "SYNC" );
 				pRGB.setPixelColor(0,  0, 255, 0);
 				break;
 			case EEMODE_SERIAL:
+				Serial.println( "SERIAL" );
 				pRGB.setPixelColor(0,  0, 0, 255);
 				break;
 		}
@@ -1118,30 +1116,35 @@ void screenSerialRead() {
 	}
 }
 
-#define SERIAL_WATCH_ERRORS
+//#define SERIAL_WATCH_ERRORS
 
 void loopSerialMode()
 {
 	screenSerialRead();
 
-        #ifdef SERIAL_WATCH_ERRORS
-        static byte lastValue = 0;
-        if( cmdBuffer[0] == 0 )
-          lastValue = 0;
-        
-        if( cmdBuffer[0] > lastValue )
-        {
-          if( cmdBuffer[0] != lastValue+1 )
-            Serial.print( "Err," );
-          else
-            Serial.print( "Ok," );
-          Serial.println( cmdBuffer[0] );
-          
-          lastValue = cmdBuffer[0];
-        }
-        
-        
-        #else
+	#ifdef SERIAL_WATCH_ERRORS
+	static byte lastValue = 0;
+	if( cmdBuffer[0] == 0 )
+	{
+		Serial.println( "Start" );
+		lastValue = 0;
+	}
+	
+	if( cmdBuffer[0] > lastValue )
+	{
+	  if( cmdBuffer[0] != lastValue+1 )
+		Serial.print( "Err," );
+	  else
+		Serial.print( "Ok," );
+	  Serial.print( cmdBuffer[0] );
+	  Serial.print( "," );
+	  Serial.println( millis() );
+	  
+	  lastValue = cmdBuffer[0];
+	}
+	
+	
+	#else
         
 	if( cmdBuffer[2] == 'X' )
 	{
@@ -1173,7 +1176,7 @@ void loop() {
 
 	// Attempt to read a serial bit from the screen.
 	screenSerialRead();
-	if( cmdBuffer[2] == 'M' && cmdBuffer[2] == 'X' )
+	if( cmdBuffer[0] == 'M' && cmdBuffer[2] == 'X' )
 	{
 		switch( cmdBuffer[1] )
 		{
@@ -1181,6 +1184,9 @@ void loop() {
 			case 'Y': detectAndSetModeChange( EEMODE_SYNCPULSE ); break;
 			case 'S': detectAndSetModeChange( EEMODE_SERIAL ); break;
 		}
+		cmdBuffer[0] = 0;
+		cmdBuffer[1] = 0;
+		cmdBuffer[2] = 0;
 	}
 	
 	// Detect which mode we are in.

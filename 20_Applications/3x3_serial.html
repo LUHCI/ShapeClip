@@ -70,6 +70,23 @@
 					for(var i=0; i<pads.length;++i) pads[i].send(["H",value,"X"])
 				};
 				
+				document.getElementById( "btnRunTest" ).onclick = function(e){
+					var sequence = [];
+					for( var i=0; i<255; i++ ) { sequence.push(i); }
+					for( var i=0; i<255; i++ ) { sequence.push(i); }
+					for(var i=0; i<pads.length;++i) pads[i].send( sequence )
+				}
+				
+				document.getElementById( "btnHeightMode" ).onclick = function(e){
+					for(var i=0; i<pads.length;++i) pads[i].send( ["M","H","X", "M","H","X", "M","H","X"] )
+				}
+				document.getElementById( "btnSyncMode" ).onclick = function(e){
+					for(var i=0; i<pads.length;++i) pads[i].send( ["M","Y","X", "M","Y","X", "M","Y","X"] )
+				}
+				document.getElementById( "btnSerialMode" ).onclick = function(e){
+					for(var i=0; i<pads.length;++i) pads[i].send( ["M","S","X", "M","S","X", "M","S","X"] )
+				}
+				
 				// Configure the colour wheel.
 				var cw = Raphael.colorwheel($("#colourwheel")[0], 150);
 				cw.onchange(function(colour){
@@ -90,7 +107,11 @@
 	<body onload="start()">
 		<div id="colourwheel"></div>
 		<div id="controls">
-			<input id="motorSlider" type="range" value="0" min="0" max="100" />
+			<input id="motorSlider" type="range" value="0" min="0" max="100" /><br />
+			<input type="button" value="Run Test" id="btnRunTest" /><br />
+			<input type="button" value="Height" id="btnHeightMode" />
+			<input type="button" value="Sync" id="btnSyncMode" />
+			<input type="button" value="Serial" id="btnSerialMode" />
 		</div>
 		<div id="sugar"><span>ShapeClip</span><span>v2</span></div>
 	</body>
