@@ -98,7 +98,7 @@ const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the m
 #define GREEN(hex) 	hex >>  8 & 0xFF
 #define BLUE(hex) 	hex >>  0 & 0xFF
 
-/** EEPROM data settings. */
+/** EEPROM data settings. NOTE: Modes cannot be zero - zero is reserved! */
 #define EEMODEADDR 0			// The address of the mode stored in EEPROM.
 #define EEMODE_CHANGETIME 5000  // The number of ms to hold the switch before the clip mode is changed.
 #define EEMODE_SYNCPULSE  45	// The Clip looks for a sync pulse on one of the LDRs.
@@ -452,7 +452,7 @@ void setup() {
 	// Debug Mode
 	//eClipMode = EEMODE_SYNCPULSE;
 	//eRGBMode  = RGBMODE_SCREEN;
-	detectModeChange( 1 );
+	detectAndSetModeChange( -1 );   // -1 == set nothing, blink code; 0 = set nothing, wait for button; >0 == set mode to supplied mode
 
 	// Wait for a random time so that not all clips zero their motor at the same time.
 	randomSeed(analogRead(PIN_RND));
@@ -471,14 +471,14 @@ void setup() {
  * Press SWBOT to change mode. Cycle through the modes every 1 second.
  * @param skip Set to 1 to emulate SWBOT being pressed.
  */
-void detectModeChange( byte skip ) {
+void detectAndSetModeChange( int skipToMode ) {
 	
 	// If SWBOT is not pressed, skip out.
-	if( digitalRead(PIN_SWBOT) == HIGH && skip != 1 )
+	if( digitalRead(PIN_SWBOT) == HIGH && skipToMode == 0 )
 		return;
 	
 	// While we are still holding SWBOT down.
-	while( digitalRead(PIN_SWBOT) == LOW )
+	while( skipToMode == 0 && digitalRead(PIN_SWBOT) == LOW )
 	{
 		// Swap mode.
 		switch( eClipMode )
@@ -512,6 +512,20 @@ void detectModeChange( byte skip ) {
 		delay( 1000 );
 	}
 	
+        if( skipToMode > 0 )
+        {
+          eClipMode = skipToMode;
+          switch( eClipMode )
+          {
+            case EEMODE_HEIGHTONLY:
+            case EEMODE_SERIAL:
+              eRGBMode  = RGBMODE_SCREEN;
+              break;
+            default:
+              eRGBMode  = RGBMODE_NONE;
+          }
+        }
+
 	// Now SWBOT has been released, flicker the colour 3 times.
 	for( int i=0; i<3; i++ )
 	{
@@ -891,12 +905,12 @@ void loopHeightMode() {
  * This will wait for a pulse, and then display colour and height changes
  * as appropriate.
  */
-void loopSerialMode() {
+static unsigned char cmdBuffer[3] = { 0, 0, 0 };  // The command buffer.
+void screenSerialRead() {
 	
 	// Static variables for the serial mode.
 	static bool flippedRead = false;						// Are we reading in "inverted" LDR mode (ie. LDR1 <> LDR2).
 	static unsigned int bitsSeen = 0;						// The number of valid bits read.
-	static unsigned char cmdBuffer[3] = { 0, 0, 0 };		// The command buffer.
 	static int oldState = 0;								// The last 'state' symbol read by the LDR: SYMB_ZERO, SYMB_LOW, SYMB_HIGH
 	#ifdef SSMODE_8BIT
 	static uint16_t bSerialBuffer = 0x00;					// The buffer to write serial commands into. 16 bit (we need space for frame headers, parity, etc).
@@ -1065,22 +1079,25 @@ void loopSerialMode() {
 			Serial.print( " " );
 			Serial.println( (unsigned char)cmdBuffer[2] );
 			#endif
-			
-			// If we have an 'X' at the end, the command is valid.
-			if( cmdBuffer[2] == 'X' )
-			{
-				switch( cmdBuffer[0] )
-				{
-					case 'R': iTargetR = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
-					case 'G': iTargetG = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
-					case 'B': iTargetB = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
-					case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
-					case 'z': zeroMotor(); break;
-				}
-			}
-		
 		}
 		
+	}
+}
+
+void loopSerialMode()
+{
+	screenSerialRead();
+	
+	if( cmdBuffer[2] == 'X' )
+	{
+		switch( cmdBuffer[0] )
+		{
+			case 'R': iTargetR = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
+			case 'G': iTargetG = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
+			case 'B': iTargetB = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
+			case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
+			case 'z': zeroMotor(); break;
+		}
 	}
 	
 	// Move the motor and update the colour.
@@ -1096,7 +1113,14 @@ void loopSerialMode() {
 void loop() {
 	
 	// Listen for a change in mode.
-	detectModeChange( 0 );
+	detectAndSetModeChange( 0 );
+
+	// Attempt to read a serial bit from the screen.
+	screenSerialRead();
+	if( cmdBuffer[2] == 'X' )
+	{
+		switch( cmdBuffer[1] )
+	}
 	
 	// Detect which mode we are in.
 	switch (eClipMode)
