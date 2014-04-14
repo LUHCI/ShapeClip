@@ -8,7 +8,8 @@
 	
 	TODO: BF - Height mode does not like LDR1 and LDR2 sensing different things -- should average them.
 	           Currently used as an "on screen" check.
-			   
+	
+	v2.5 - JV - Minor tweaks to height mode
 	v2.4 - JV - Moved serial buffer updates to a seperate call, serial now updated regardless of mode.	
 	v2.3 - JH - Fixes to serial RGB colour display.
 	v2.2 - JH - Motor driver accumulator. Known bug which does not let it drive to the extents.
@@ -89,7 +90,7 @@ const int SAMPLE_WINDOW = 90;								// The amount of time (ms) to sample the LD
 #define PULSE_STATE__ACTIVE_PULSE  1	// The sync-pulse check returned a pulse! It's probably on a screen.
 
 /** Sensor settings. */
-#define ON_SCREEN_TIMEIN 1000			// The amount of time before height mode accepts an on screen value. One second in ms.
+#define ON_SCREEN_TIMEIN 500			// The amount of time before height mode accepts an on screen value. One second in ms.
 const int LDR_MIN_LIMIT = 120;				// The smallest acceptable delta between the min and max values of the LDR.
 const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the min and max values of the LDR.
 #define LDR_OFFSCREEN_DELTA_GAP 100 	// The largest gap between the LDR values at which it is considered off-screen.
@@ -111,6 +112,7 @@ const int LDR_MAX_LIMIT = 1000;				// The largest acceptable delta between the m
 //#define SERIAL_INFO			// Should device values be streamed via serial? csv: ms, ldr1, ldr2, rgb, height, frc, haspulse, swbot
 //#define SERIAL_SYNC_DEBUG		// Should sync pulse debug data be streamed via serial? csv: ms, r, g, b
 //#define SERIAL_SYNC_DEBUG2	// Should the verbose sync pulse debug data be streamed via serial? csv: ms, slope, max, r, g, b, min, raw
+//#define EMIT_MODES
 
 /** Colour modes - how the RGB LED is controlled. */
 #define RGBMODE_NONE     0		// The RGB LED displays nothing.
@@ -458,7 +460,7 @@ void setup() {
 	Serial.begin(115200);
 	
 	// Wait two seconds.
-	Serial.println("Boot v2.3");
+	Serial.println("Boot v2.5");
 	
 	// Select a default clip mode from the set of possible modes, if one is not set.
 	eClipMode = EEPROM.read(EEMODEADDR);
@@ -558,15 +560,21 @@ void detectAndSetModeChange( int skipToMode ) {
 		switch( eClipMode )
 		{
 			case EEMODE_HEIGHTONLY:
+				#ifdef EMIT_MODES
 				Serial.println( "HEIGHT" );
+				#endif
 				pRGB.setPixelColor(0,  255, 0, 0);
 				break;
 			case EEMODE_SYNCPULSE:
+				#ifdef EMIT_MODES
 				Serial.println( "SYNC" );
+				#endif
 				pRGB.setPixelColor(0,  0, 255, 0);
 				break;
 			case EEMODE_SERIAL:
+				#ifdef EMIT_MODES
 				Serial.println( "SERIAL" );
+				#endif
 				pRGB.setPixelColor(0,  0, 0, 255);
 				break;
 		}
@@ -826,6 +834,7 @@ void loopSyncPulseMode() {
  *   become more accurate.
  */
 void loopHeightMode() {
+	static WindowVariance * valueVariance = new WindowVariance(5);
 	
 	// Determine historic variables for height sampling.
 	static uint16_t min = 99999;
@@ -845,12 +854,17 @@ void loopHeightMode() {
 		
 		// Compute the mean.
 		uint16_t iMean  = (iSample1 + iSample2) * 0.5;
+		valueVariance->push( iMean );
 		
 		// Start this frame by assuming we are not on the screen.
 		bOnScreen = false;
 		
 		// If the LDRs are sensing the same thing, we are probably on the screen.
-		boolean bDelta_Suggest = iDelta <= LDR_OFFSCREEN_DELTA_GAP;
+		#ifdef HEIGHT_DELTA_CHECK
+			boolean bDelta_Suggest = iDelta <= LDR_OFFSCREEN_DELTA_GAP;
+		#else
+			boolean bDelta_Suggest = true;
+		#endif
 		if (bDelta_Suggest)
 		{
 			// Update the ranges.
@@ -872,7 +886,7 @@ void loopHeightMode() {
 				{
 					// Set the flag and update the motor height.
 					bOnScreen = true;
-					iTargetPos = constrain(map(iMean, min, max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
+					iTargetPos = constrain(map(valueVariance->mean(), min, max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
 				}
 				else
 				{
@@ -909,13 +923,13 @@ void loopHeightMode() {
 		}
 		
 		#ifdef HEIGHT_DEBUG // csv: on screen, ldr1, ldr2, min, max, value
-		Serial.print(bOnScreen ? 100 : 0); Serial.print(",");	
+		/*Serial.print(bOnScreen ? 100 : 0); Serial.print(",");	
 		Serial.print(iSample1); Serial.print(",");
 		Serial.print(iSample2); Serial.print(",");
 		
 		Serial.print(min); Serial.print(",");
 		Serial.print(max); Serial.print(",");
-		Serial.print(iMean); Serial.print("\n");
+		Serial.print(iMean); Serial.print("\n");*/
 		#endif
 	}
 	
