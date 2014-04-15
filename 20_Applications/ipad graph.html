@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0,user-scalable=no" />
+		
+		<!--<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>-->
+		<style>
+			html, body {  font-family: 'Cabin', sans-serif; color: white; background-color: black; margin: 0px;}
+			
+			
+			#controls { position: fixed; bottom: 0px; height: 10%; width: 100%; display: block; background-color: red; text-align: center; } 
+			#controls button { margin: 5px; margin-top: 20px;  line-height: 32px; font-size: 16px; background: white; border: 1px solid blue; }
+			#controls button:active { line-height: 32px; font-size: 16px; background: yellow; border: 1px solid blue; }
+			#gradient { position: fixed; top: 0px; height: 90%; width: 100%; display: block; background-color: black; } 
+
+		</style>
+				
+		<!-- Shape Clip -->
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
+		
+		<!-- JQuery -->
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<!-- Colour Wheel -->
+		
+		<script type="text/javascript">
+	
+
+			$(document).ready(function(){
+				
+				// Correct ppi value.
+				//var agent = navigator.userAgent.toLowerCase();
+				//if 		(agent.indexOf("windows") 	!= -1) 	{ }
+				//if 		(agent.indexOf("nexus 5") 	!= -1) 	{ __ppi(150); }
+				//else if (agent.indexOf("ipad") 		!= -1) 	{ __ppi(160); }
+				//console.log("User Agent: " + navigator.userAgent.toLowerCase());
+				
+				// The size of the shape-clip pad in mm.
+				//var SC_SIZE = __px(20);
+				
+				// Create one clip.
+				//height_pad = new ShapeClipHeight({x: __px(30), y: __px(30), width: SC_SIZE, height: SC_SIZE});
+				//height_pad.outline(true);
+				//height_pad.height(1.0);
+				
+				$("#btnLeftToRight").click(function(){ $("#gradient").css("background", "-webkit-linear-gradient(left, black , white)"); });
+				$("#btnRightToLeft").click(function(){ $("#gradient").css("background", "-webkit-linear-gradient(left, white , black)"); });
+				$("#btnLow").click(function(){ $("#gradient").css("background", "black"); });
+				$("#btnHigh").click(function(){ $("#gradient").css("background", "white"); });
+				
+					
+			});
+			
+				
+		
+		</script>
+		
+	</head>
+	
+	<body>
+		<div id="gradient"/>
+		<div id="controls">
+			<button id="btnLeftToRight">Upward Trends</button>
+			<button id="btnRightToLeft">Downward Trends</button>
+			<button id="btnLow">Low</button>
+			<button id="btnHigh">High</button>
+		</div>
+	</body>
+
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0,user-scalable=no" />
+		
+		<!--<link href='http://fonts.googleapis.com/css?family=Cabin:400,700' rel='stylesheet' type='text/css'>-->
+		<style>
+			html, body {  font-family: 'Cabin', sans-serif; color: white; }
+
+			body
+			{
+				/* background: url(res/uk_map_small.png) no-repeat; */
+				background: url(res/uk_map_small.png) no-repeat center center fixed; 
+				-webkit-background-size: cover;
+				position : fixed; display : block; width : 100%; height: 100%; left: 0px; top: 0px;
+			}
+
+			.masked
+			{
+				position : fixed; display : block; width : 100%; height: 100%; left: 0px; top: 0px;
+				background : url(res/uk_population_grayscale.png) no-repeat;
+				background-size: 100% 100%;
+				-webkit-mask-image: radial-gradient(circle 0, rgba(255,255,255,1) 60%,rgba(255,255,255,0) 100%);
+			}
+		</style>
+				
+		<!-- Shape Clip -->
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
+		
+		<!-- JQuery -->
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<!-- Colour Wheel -->
+		
+		<script type="text/javascript">
+	
+
+			$(document).ready(function(){
+				
+				// Correct ppi value.
+				var agent = navigator.userAgent.toLowerCase();
+				if 		(agent.indexOf("windows") 	!= -1) 	{ }
+				if 		(agent.indexOf("nexus 5") 	!= -1) 	{ __ppi(150); }
+				else if (agent.indexOf("ipad") 		!= -1) 	{ __ppi(160); }
+				console.log("User Agent: " + navigator.userAgent.toLowerCase());
+				
+				// The size of the shape-clip pad in mm.
+				var SC_SIZE = __px(20);
+				
+				// Create one clip.
+				//height_pad = new ShapeClipHeight({x: __px(30), y: __px(30), width: SC_SIZE, height: SC_SIZE});
+				//height_pad.outline(true);
+				//height_pad.height(1.0);
+				
+				function lensOff() {
+					$(this).css({'-webkit-mask-image': '' });
+				}
+
+				function lensMove(e) {
+					var mouseX = e.pageX - $(this).offset().left;
+					var mouseY = e.pageY - $(this).offset().top;
+					$(this).css({
+						'-webkit-mask-image': 'radial-gradient(circle 100px at ' + mouseX + 'px ' + mouseY + 'px, rgba(255,255,255,1) 90%, rgba(255,255,255,0) 100%)',
+						'cursor': 'none'
+					});
+				  
+				}
+
+				$('.masked').on({
+				  'mousemove': lensMove,
+				  'mouseleave': lensOff
+				});
+					
+			});
+			
+				
+		
+		</script>
+		
+	</head>
+	
+	<body>
+		<div class="masked"/>
+	</body>
+
+</html>
