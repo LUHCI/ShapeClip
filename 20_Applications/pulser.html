@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ShapeClip | Demo Page</title>
+		
+		<!-- Styling -->
+		<style>
+			* { position: fixed; display : block; margin : 0; width : 100%; height: 100%; }
+			html { background-color: black; } 
+			body { background-color: white; };
+		</style>
+		
+		<!-- Shape Clip
+		<script type="text/javascript" src="../10_Driver/ShapeClipAPI.js"></script>
+		 -->
+		<!-- JQuery -->
+		<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+		
+		<script type="text/javascript">
+			
+			$(document).ready(function() {
+				
+				function pulse() {
+					$("body").fadeIn(2000).fadeOut(2000, pulse);
+				}
+				pulse();
+				
+				
+			});
+			
+		</script>
+		
+	</head>
+	
+	<body>
+	
+	</body>
+	
+</html>

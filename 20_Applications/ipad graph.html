@@ -15,7 +15,9 @@
 			#controls button { margin: 5px; margin-top: 20px;  line-height: 32px; font-size: 16px; background: white; border: 1px solid blue; }
 			#controls button:active { line-height: 32px; font-size: 16px; background: yellow; border: 1px solid blue; }
 			#gradient { position: fixed; top: 0px; height: 90%; width: 100%; display: block; background-color: black; } 
-
+			#cover { position: fixed; top: 0px; height: 90%; width: 100%; display: block; background: url(http://blog.engglib.upd.edu.ph/wp-content/uploads/2013/03/interactions-nov-dec20121.jpg); background-size: 100% 100%;  } 
+			#message { position: fixed; top: 20%; height: 30%; width: 100%; display: block; background: gray; font-size: 2em; text-align: center; color: white; line-height: 250px; } 
+			
 		</style>
 				
 		<!-- Shape Clip -->
@@ -50,8 +52,9 @@
 				$("#btnRightToLeft").click(function(){ $("#gradient").css("background", "-webkit-linear-gradient(left, white , black)"); });
 				$("#btnLow").click(function(){ $("#gradient").css("background", "black"); });
 				$("#btnHigh").click(function(){ $("#gradient").css("background", "white"); });
+				$("#btnViewGraph").click(function(){ $("#cover").fadeToggle(); });
 				
-					
+				
 			});
 			
 				
@@ -61,12 +64,16 @@
 	</head>
 	
 	<body>
-		<div id="gradient"/>
+		
+		<div id="gradient"></div>
+		<div id="message">Please attach Shape Clips</div>
+		<div id="cover"></div>
 		<div id="controls">
-			<button id="btnLeftToRight">Upward Trends</button>
-			<button id="btnRightToLeft">Downward Trends</button>
+			<button id="btnLeftToRight">Upward</button>
+			<button id="btnRightToLeft">Downward </button>
 			<button id="btnLow">Low</button>
 			<button id="btnHigh">High</button>
+			<button id="btnViewGraph">View Data</button>
 		</div>
 	</body>
 
