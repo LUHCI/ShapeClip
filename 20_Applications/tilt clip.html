@@ -46,8 +46,8 @@
 				// The size of the shape-clip pad in mm.
 				var SC_SIZE = __px(20);
 				
-				var xOffset = 4;
-				var yOffset = 2;
+				var xOffset = 60;
+				var yOffset = 30;
 				
 				function build(x, y) {
 					var pad = new ShapeClipHeight({x: __px(xOffset + x), y: __px(yOffset + y), width: SC_SIZE, height: SC_SIZE});
@@ -58,11 +58,10 @@
 				
 				// Create one clip.
 				pLT = build(10, 10);
-				pLB = build(10, 60);
-				pRT = build(60, 10);
-				pRB = build(60, 60);
+				pLB = build(10, 105);
+				pRT = build(102, 10);
+				pRB = build(102, 105);
 				pads = [pLT, pLB, pRT, pRB ];
-				
 				
 				document.getElementById("hSlider").onchange = function(e){
 					var value = this.value * 0.01;
@@ -72,7 +71,6 @@
 					pRT.height(1.0 - value);
 					pRB.height(1.0 - value);
 				};
-
 				document.getElementById("vSlider").onchange = function(e){
 					var value = this.value * 0.01;
 					pLT.height(value);
