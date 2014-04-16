@@ -52,7 +52,7 @@
 				$("#btnRightToLeft").click(function(){ $("#gradient").css("background", "-webkit-linear-gradient(left, white , black)"); });
 				$("#btnLow").click(function(){ $("#gradient").css("background", "black"); });
 				$("#btnHigh").click(function(){ $("#gradient").css("background", "white"); });
-				$("#btnViewGraph").click(function(){ $("#cover").fadeToggle(); });
+				$("#btnViewGraph").click(function(){ $("#cover").fadeToggle(); setTimeout(function(){ $("#message").fadeToggle();}, 4000); });
 				
 				
 			});
