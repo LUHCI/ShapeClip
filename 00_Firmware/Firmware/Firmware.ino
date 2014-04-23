@@ -6,9 +6,6 @@
 		JV - John Vidler
 		MS - Matthias Schitthelm
 	
-	TODO: BF - Height mode does not like LDR1 and LDR2 sensing different things -- should average them.
-	           Currently used as an "on screen" check.
-	
 	v2.5 - JV - Minor tweaks to height mode
 	v2.4 - JV - Moved serial buffer updates to a seperate call, serial now updated regardless of mode.	
 	v2.3 - JH - Fixes to serial RGB colour display.
