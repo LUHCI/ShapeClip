@@ -25,22 +25,22 @@
 	| SCREEN SERIAL COMMANDS |
  	\------------------------/
         
-        Format: [Command][Parameter][X]
-        Each part is a single byte, and the last byte should always be ASCII 'X'.
-        
-        When in serial mode:
-        [R][0-255][X] - Set red value
-        [G][0-255][X] - Set green value
-        [B][0-255][X] - Set blue value
-        [H][0-255][X] - Set height value
-        [Z][any][X]   - Zero the actuator
-        
-        When in any mode:
-        [M][H][X] - Change to height mode
-        [M][Y][X] - Change to syncpulse mode
-        [M][S][X] - Change to serial command mode.
-        
-        
+	Format: [Command][Parameter][X]
+	Each part is a single byte, and the last byte should always be ASCII 'X'.
+	
+	When in serial mode:
+	[R][0-255][X] - Set red value
+	[G][0-255][X] - Set green value
+	[B][0-255][X] - Set blue value
+	[H][0-255][X] - Set height value
+	[Z][any][X]   - Zero the actuator
+	
+	When in any mode:
+	[M][H][X] - Change to height mode
+	[M][Y][X] - Change to syncpulse mode
+	[M][S][X] - Change to serial command mode.
+	
+	
 */
 
 /* External and 3rd party libraries. */ 
@@ -67,10 +67,252 @@
 #define PIN_LDR1  A6		// The LDR1 input (analog).
 #define PIN_LDR2  A7		// The LDR2 input (analog).
 
-/* Motor characteristics */
-#define MOTOR_ANGLE 20		// The degrees turned with each motor step.
-#define MOTOR_SPEED 1500	// The motor speed in rotations per minute (RPMs).
-#define MOTOR_TRAVEL 470	// The number of steps to move the nut from the top to the bottom.
+
+/* Actuation Type */
+#define ACTUATOR_STEPPER		// Use the stepper acuator type.
+//#define ACTUATOR_SLIDER
+//#define ACTUATOR_SERVO
+//#define ACTUATOR_ROTARY
+
+
+#define ACTUATOR_MAX 255		// Maximum position/angle/speed of the actuator.
+#define ACTUATOR_MIN 0			// Minimum position/angle/speed of the actuator.
+int iActuatorCurrent = 0;		// Actuator last measured position/angle/speed.
+int iActuatorTarget  = 0;		// Actuator target position/angle/speed.
+
+/* Actuation characteristics */
+#ifdef ACTUATOR_STEPPER
+	#define STEPPER_ANGLE 	20		// The degrees turned with each motor step.
+	#define STEPPER_SPEED 	1500	// The motor speed in rotations per minute (RPMs).
+	#define STEPPER_TRAVEL 	470		// The number of steps to move the nut from the top to the bottom.
+	
+	#define ACTUATOR_MAX STEPPER_TRAVEL		// Maximum position/angle/speed of the actuator.
+	#define ACTUATOR_MIN 0					// Minimum position/angle/speed of the actuator.
+	
+	Stepper motor(STEPPER_ANGLE, PIN_MIN11, PIN_MIN12, PIN_MIN21, PIN_MIN22);
+	boolean bMotorCalibrated = false;	// Is the motor position value accurate?
+	
+	/** Set up the motor. Called once when the device starts. */
+	void configureActuator() {
+		motor.setSpeed(STEPPER_SPEED);
+	}
+	
+	/** Actuate based on the target values set. */
+	void actuate() {
+		
+		// Only do this if the motor is calibrated.
+		if (!bMotorCalibrated)
+			return;
+		
+		#define STEP_ACCM_SIZE 5								// The max number of steps to accumulate before batching.
+		static boolean bAllowMotorShutdown = true;				// Is the motor allowed to shutdown.
+		static unsigned long shutdownTimeout = millis();		// The time of the last step.
+		static unsigned int iStepAccumulator = 0;				// The step accumulator.
+		
+		// If we have a small change in position, add it to the accumulator.
+		//   so that we can batch it later.  If we do not do this, small steps
+		//   are often lost.
+		//   This also has the nice side effect as acting like a noise absorber.
+		int iDelta = iActuatorTarget - iActuatorCurrent;
+		if (abs(iDelta) < STEP_ACCM_SIZE)
+		{
+			iStepAccumulator += iDelta;
+			iDelta = 0;
+		}
+		
+		// If the accumulated steps + the change this frame is over the minimum step, then step.
+		int iAdjustedSteps = iStepAccumulator + iDelta;
+		
+		// Or if we are at either end (the accumulator would absorb it, so we need a (literal) edge case).
+		//bool bEdgeCase = ((iActuatorTarget < (0 + STEP_ACCM_SIZE)) || (iActuatorTarget > (STEPPER_TRAVEL - STEP_ACCM_SIZE)) & abs(iAdjustedSteps) > 2) ;
+		
+		// Do the check.
+		if (abs(iAdjustedSteps) >= STEP_ACCM_SIZE /* || bEdgeCase */) 
+		{
+			// Compute the step direction.
+			int step = iAdjustedSteps >= 0 ? 1 : -1;
+			
+			/* This approach leads to faster and smoother stepping, kinda tearing noisy tho. */
+			if (abs(iAdjustedSteps) > 20)
+			{
+				motor.step(step * 20);
+				iActuatorCurrent += (step * 20);
+			}
+			if (abs(iAdjustedSteps) > 10)
+			{
+				motor.step(step * 10);
+				iActuatorCurrent += (step * 10);
+			}
+			else
+			{
+				motor.step(step);
+				iActuatorCurrent += step;
+			}
+			
+			// Write the last step time.
+			shutdownTimeout = millis();
+			bAllowMotorShutdown = true;
+		}
+		
+		// If we have not stepped for 0.5s, turn off the motor.
+		if ((millis() - shutdownTimeout) > 250)
+		{
+			// If we have not already shut the motor down.
+			//if (bAllowMotorShutdown)
+			//{
+				motor.shutdown();
+				bAllowMotorShutdown = false;
+			//}
+		}
+	
+	}
+	
+	/** Reset the actuator to 0. Typically done at startup. */
+	void zeroActuator() {
+	
+		// Zero flags.
+		bMotorCalibrated = false;
+		
+		// Until the motor is calibrated, step down each time.
+		for(int iAvailableSteps = STEPPER_TRAVEL; iAvailableSteps >= 0; iAvailableSteps--)
+			motor.step(-1);
+		
+		// Set the motor position to 0 (known location).
+		bMotorCalibrated = true;
+		iActuatorCurrent = 0;
+		
+		// Shut the motor down.
+		motor.shutdown();
+	}
+#endif
+
+#ifdef ACTUATOR_SLIDER
+	#define SLIDER_P 0.9		// 
+	#define SLIDER_I 0.4		// 
+	#define SLIDER_D 0.0		// 
+	
+	#define SLIDER_ADC_MAX 1024		// Largest slider ADC value.
+	#define SLIDER_ADC_MIN 0		// Smallest slider ADC value.
+	
+	#define ACTUATOR_MAX 255		// Maximum position/angle/speed of the actuator.
+	#define ACTUATOR_MIN 0			// Minimum position/angle/speed of the actuator.
+	
+	/** Set up the slider. Called once when the device starts. */
+	void configureActuator() {
+		
+		// Motor pins as output.
+		pinMode(PIN_MIN11, OUTPUT);
+		pinMode(PIN_MIN12, OUTPUT);
+		pinMode(PIN_MIN21, OUTPUT);
+		pinMode(PIN_MIN22, OUTPUT);
+	}
+	
+	/** Actuate based on the target values set. */
+	void actuate() {
+		
+		// Read the current value.
+		int adc = analogRead(PIN_TOUCH);
+		iActuatorTarget = constrain(map(adc, SLIDER_ADC_MIN, SLIDER_ADC_MAX, ACTUATOR_MIN, ACTUATOR_MAX), ACTUATOR_MIN, ACTUATOR_MAX);
+		
+		// PID current to match target.
+		// TODO
+	}
+	
+	/** Reset the actuator to 0. Typically done at startup. */
+	void zeroActuator() {
+		setAcuatorTarget(0, ACTUATOR_MIN, ACTUATOR_MAX);
+	}
+	
+#endif
+
+#ifdef ACTUATOR_SERVO
+	#include <Servo.h>				// http://playground.arduino.cc/Learning/SingleServoExample
+	Servo servo;
+	#define SERVO_MAX_PULSE 2000	// 
+	#define SERVO_MIN_PULSE 700		// 
+	
+	#define ACTUATOR_MIN 0			// The smallest number of degrees for the servo.
+	#define ACTUATOR_MAX 180		// The largest number of degrees for the servo.
+	
+	/** Set up the slider. Called once when the device starts. */
+	void configureActuator() {
+		servo.attach(PIN_TOUCH);	// Re-use the touch out pin (digital).
+	}
+	
+	/** Actuate based on the target values set. */
+	void actuate() {
+		
+		// Read the latest value.
+		iActuatorCurrent = servo.read();	// already between 0 and 180.
+		
+		// Compute the angle as the target / actual mapped between 0 and 180.
+		servo.write(iActuatorTarget);
+		Servo::refresh();
+	}
+	
+	/** Reset the actuator to 0. Typically done at startup. */
+	void zeroActuator() {
+		
+		// Set target to 0.
+		setAcuatorTarget(0, 0, 255);
+		
+		// Wait until we reach 0.
+		while (iActuatorCurrent != ACTUATOR_MIN)
+			actuate();
+	}
+	
+#endif
+
+#ifdef ACTUATOR_ROTARY
+	
+	#define ACTUATOR_CENTER	128		// The centre point for controlling direction.
+	#define ACTUATOR_MIN 0			// The lowest speed for the motor.
+	#define ACTUATOR_MAX 255		// The top speed for the motor.
+	
+	/** Set up the rotary motor. Called once when the device starts. */
+	void configureActuator() {
+		
+		// Motor pins as output.
+		pinMode(PIN_MIN11, OUTPUT);
+		pinMode(PIN_MIN12, OUTPUT);
+		pinMode(PIN_MIN21, OUTPUT);
+		pinMode(PIN_MIN22, OUTPUT);
+	}
+	
+	/** Actuate based on the target values set. */
+	void actuate() {
+		
+		// The current is ALWAYS the target.
+		iActuatorCurrent = iActuatorTarget;	
+		
+		// Calculate speed based on the target and center point.
+		// TODO
+	}
+	
+	/** Reset the actuator to 0. Typically done at startup. */
+	void zeroActuator() {
+		setAcuatorTarget(ACTUATOR_CENTER, ACTUATOR_MIN, ACTUATOR_MAX);
+	}
+#endif
+
+
+/** 
+ * Set the target set point for the actuator.
+ * @param value The value between the sourceMin and sourceMax.
+ * @param sourceMin The input source min.
+ * @param sourceMin The input source max.
+ * The source min and max are provided to avoid unecessary loss of precision from different data sources.
+ */
+void setAcuatorTarget(int value, int sourceMin, int sourceMax) {
+	iActuatorTarget = constrain(map(value, sourceMin, sourceMax, ACTUATOR_MIN, ACTUATOR_MAX), ACTUATOR_MIN, ACTUATOR_MAX);
+}
+
+/** Return the target of the actuator. */
+int getActuatorTarget() { return iActuatorTarget; }
+
+/** Return the current value of the actuator mapped over a byte. */
+int getActuatorCurrent() { return iActuatorCurrent; } //map(iActuatorCurrent, 0, 255); }
+
 
 /* Sync pulse mode settings. */
 const float SYNC_SIGNAL_DROP_THRESHOLD = 3.0f; 				// Based on the behaviour of the LDR with a 10k resistor on a Dell LCD monitor.
@@ -177,13 +419,9 @@ boolean checkSample(int iRelativeTime, int iSampleOffset, int iWindowSize) {
 
 
 // ShapeClip v1 controls and live values.
-Stepper motor(MOTOR_ANGLE, PIN_MIN11, PIN_MIN12, PIN_MIN21, PIN_MIN22);
 Adafruit_NeoPixel pRGB = Adafruit_NeoPixel(1, PIN_RGB_OUT, NEO_GRB + NEO_KHZ800);
 LDR ldr1(PIN_LDR1);
 LDR ldr2(PIN_LDR2);
-
-boolean bMotorCalibrated = false;	// Is the motor position value accurate?
-int iMotorPosition = 0;				// The current number of steps in the motor.
 
 int eClipMode = EEMODE_SYNCPULSE;	// Current Clip mode.
 int eRGBMode = RGBMODE_NONE;		// Current RGB mode.
@@ -192,8 +430,6 @@ bool bOnScreen = false;				// Is the shape clip device on the screen (i.e. does 
 int iTargetR = 0;					// Target RED component.
 int iTargetG = 0;					// Target GREEN component.
 int iTargetB = 0;					// Target BLUE component.
-int iTargetPos = 0;					// Target MOTOR height (steps).
-
 
 
 /**
@@ -223,7 +459,7 @@ void configure() {
 	pinMode(PIN_FORCE, INPUT);
 	
 	// Set up the motor.
-	motor.setSpeed(MOTOR_SPEED);
+	configureActuator();
 	
 	// Set up the RGB LED.
 	pRGB.begin();
@@ -234,34 +470,18 @@ void configure() {
 }
 
 /**
- * @brief This will send the motor DOWN until the SWBOT is triggered OR the full MOTOR_TRAVEL is used.
- * It will set the iMotorPosition value to 0 and not allow calls to moveMotor while operating.
+ * @brief This will send the motor DOWN until the SWBOT is triggered OR the full STEPPER_TRAVEL is used.
+ * It will set the iActuatorCurrent value to 0 and not allow calls to moveMotor while operating.
  */
 void zeroMotor() {
-	
-	// Zero flags.
-	bMotorCalibrated = false;
 	
 	// Put us into setup mode (RGB LED).
 	int eLastMode = eRGBMode;
 	eRGBMode = RGBMODE_STARTUP;
 	updateColour();
 	
-	// Until the motor is calibrated, step down each time.
-	for(int iAvailableSteps = MOTOR_TRAVEL; iAvailableSteps >= 0; iAvailableSteps--) {
-		motor.step(-1);
-
-		//#ifdef SWBOT_MOTOR
-		//if (digitalRead(PIN_SWBOT) == LOW) break;
-		//#endif
-	}
-	
-	// Set the motor position to 0 (known location).
-	bMotorCalibrated = true;
-	iMotorPosition = 0;
-	
-	// Shut the motor down.
-	motor.shutdown();
+	// Reset the actuator to 0.
+	zeroActuator();
 	
 	// Take us out of setup mode.
 	eRGBMode = eLastMode;
@@ -275,128 +495,7 @@ void zeroMotor() {
  */
 void moveMotor() {
 	
-	// Only do this if the motor is calibrated.
-	if (!bMotorCalibrated)
-		return;
-	
-	#define STEP_ACCM_SIZE 5								// The max number of steps to accumulate before batching.
-	static boolean bAllowMotorShutdown = true;				// Is the motor allowed to shutdown.
-	static unsigned long shutdownTimeout = millis();		// The time of the last step.
-	static unsigned int iStepAccumulator = 0;				// The step accumulator.
-	
-	
-	// If we have a small change in position, add it to the accumulator.
-	//   so that we can batch it later.  If we do not do this, small steps
-	//   are often lost.
-	//   This also has the nice side effect as acting like a noise absorber.
-	int iDelta = iTargetPos - iMotorPosition;
-	if (abs(iDelta) < STEP_ACCM_SIZE)
-	{
-		iStepAccumulator += iDelta;
-		iDelta = 0;
-	}
-	
-	// If the accumulated steps + the change this frame is over the minimum step, then step.
-	int iAdjustedSteps = iStepAccumulator + iDelta;
-	
-	// Or if we are at either end (the accumulator would absorb it, so we need a (literal) edge case).
-	//bool bEdgeCase = ((iTargetPos < (0 + STEP_ACCM_SIZE)) || (iTargetPos > (MOTOR_TRAVEL - STEP_ACCM_SIZE)) & abs(iAdjustedSteps) > 2) ;
-	
-	// Do the check.
-	if (abs(iAdjustedSteps) >= STEP_ACCM_SIZE /* || bEdgeCase */) 
-	{
-		// Compute the step direction.
-		int step = iAdjustedSteps >= 0 ? 1 : -1;
-		
-		/* vv This approach leads to jumpy / inconsistent step behaviours.
-		// Limit to 25 steps per frame.
-		if (abs(iAdjustedSteps) <= 25)
-		{
-			motor.step(step * iAdjustedSteps);
-			iMotorPosition += (step * iAdjustedSteps);
-		}
-		else
-		{
-			motor.step(step * 25);
-			iMotorPosition += (step * 25);
-		}
-		*/
-		
-		/* vv This approach leads to faster and smoother stepping, kinda tearing noisy tho. */
-		if (abs(iAdjustedSteps) > 20)
-		{
-			motor.step(step * 20);
-			iMotorPosition += (step * 20);
-		}
-		if (abs(iAdjustedSteps) > 10)
-		{
-			motor.step(step * 10);
-			iMotorPosition += (step * 10);
-		}
-		else
-		{
-			motor.step(step);
-			iMotorPosition += step;
-		}
-		
-		//Serial.print("Stepping ");
-		//Serial.println(iAdjustedSteps);
-		
-		// Write the last step time.
-		shutdownTimeout = millis();
-		bAllowMotorShutdown = true;
-	}
-	
-	// If we have not stepped for 0.5s, turn off the motor.
-	if ((millis() - shutdownTimeout) > 250)
-	{
-		// If we have not already shut the motor down.
-		//if (bAllowMotorShutdown)
-		//{
-			motor.shutdown();
-			bAllowMotorShutdown = false;
-		//}
-	}
-	
-	
-	
-	
-	/*
-	// Compute the distance to travel.
-	int iDelta = iTargetPos - iMotorPosition;
-	
-	// If we have to move over 2 steps in either direction.
-	if (abs(iDelta) > 1)
-	{
-		// Move one step in the correct direction and update the motor position.
-		int step = iDelta >= 0 ? 1 : -1;
-		
-		// Skip for 20 steps.
-		if (abs(iDelta) > 20)
-		{
-			motor.step(step * 20);
-			iMotorPosition += (step * 20);
-		}
-		// Skip for 10 steps.
-		if (abs(iDelta) > 10)
-		{
-			motor.step(step * 10);
-			iMotorPosition += (step * 10);
-		}
-		// Detailed steps.
-		else
-		{
-			motor.step(step);
-			iMotorPosition += step;
-		}
-	}
-	
-	// Otherwise shut the motor down.
-	else
-	{
-		motor.shutdown();
-	}
-	*/
+
 }
 
 /**
@@ -587,7 +686,7 @@ void detectAndSetModeChange( int skipToMode ) {
 	iTargetR = 0;
 	iTargetG = 0;
 	iTargetB = 0;
-	iTargetPos = 0;
+	setAcuatorTarget(0, 0, 255);	// iTargetPos = 0;
 	bOnScreen = false;
 	
 	// Store new mode to EEPROM.
@@ -763,7 +862,7 @@ void loopSyncPulseMode() {
 		if (ldr2.limitsInRange(LDR_MIN_LIMIT, LDR_MAX_LIMIT))
 		{
 			// Move the motor in the direction of the target position.
-			iTargetPos = ldr2.mapMinMax(pSmooth->mean(), 0, MOTOR_TRAVEL);
+			setAcuatorTarget(pSmooth->mean(), ldr2.min, ldr2.max);	// iTargetPos = ldr2.mapMinMax(pSmooth->mean(), 0, STEPPER_TRAVEL);
 			moveMotor();
 			
 			// Remove the limit reset counter value (we have good limits).
@@ -815,9 +914,13 @@ void loopSyncPulseMode() {
 		Serial.print(RGB(iTargetR, iTargetG, iTargetB), HEX); Serial.print(" "); 	// RGB
 		Serial.print(pRGB.getPixelColor(0), HEX); Serial.print(","); 				// RGB
 
-		Serial.print(iMotorPosition); Serial.print(","); 							// current height
+		Serial.print(getActuatorCurrent()); Serial.print(","); 							// current height
+		
+		//Serial.print(iMotorPosition); Serial.print(","); 							// current height
 		//Serial.print(analogRead(PIN_FORCE)); Serial.print(","); 					// force
-		Serial.print(iTargetPos); Serial.print(","); 								// target height
+		
+		//Serial.print(iTargetPos); Serial.print(","); 								// target height
+		Serial.print(getActuatorTarget()); Serial.print(","); 								// target height
 		Serial.print(bOnScreen ? "Y" : "N"); Serial.print(","); 					// has sync pulse
 		Serial.print(digitalRead(PIN_SWBOT) == 0 ? "Y" : "N"); Serial.print("\n");	// swbot
 	}
@@ -883,7 +986,7 @@ void loopHeightMode() {
 				{
 					// Set the flag and update the motor height.
 					bOnScreen = true;
-					iTargetPos = constrain(map(valueVariance->mean(), min, max, 0, MOTOR_TRAVEL), 0, MOTOR_TRAVEL);
+					setAcuatorTarget(valueVariance->mean(), min, max);	// iTargetPos = constrain(map(valueVariance->mean(), min, max, 0, STEPPER_TRAVEL), 0, STEPPER_TRAVEL);
 				}
 				else
 				{
@@ -1129,8 +1232,8 @@ void screenSerialRead() {
 
 //#define SERIAL_WATCH_ERRORS
 
-void loopSerialMode()
-{
+void loopSerialMode() {
+	
 	screenSerialRead();
 
 	#ifdef SERIAL_WATCH_ERRORS
@@ -1153,10 +1256,7 @@ void loopSerialMode()
 	  
 	  lastValue = cmdBuffer[0];
 	}
-	
-	
 	#else
-        
 	if( cmdBuffer[2] == 'X' )
 	{
 		switch( cmdBuffer[0] )
@@ -1164,7 +1264,7 @@ void loopSerialMode()
 			case 'R': iTargetR = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
 			case 'G': iTargetG = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
 			case 'B': iTargetB = (unsigned)cmdBuffer[1]; eRGBMode = RGBMODE_SCREEN; break;
-			case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, MOTOR_TRAVEL ); break;
+			case 'H': setAcuatorTarget((unsigned)cmdBuffer[1], 0, 0xFF); break;	//case 'H': iTargetPos = map( (unsigned)cmdBuffer[1], 0, 0xFF, 0, STEPPER_TRAVEL ); break;
 			case 'Z': zeroMotor(); break;
 		}
 	}
@@ -1242,8 +1342,11 @@ void loop() {
 				{
 					Serial.print(millis()); Serial.print(","); 				// ShapeClip time in ms.
 					Serial.print(analogRead(PIN_FORCE)); Serial.print(","); // Force reading.
-					Serial.print(iMotorPosition); Serial.print(","); 		// Current MOTOR HEIGHT.
-					Serial.print(iTargetPos); Serial.print(","); 			// Target MOTOR HEIGHT.
+					
+					Serial.print(getActuatorTarget()); Serial.print(","); 		// Current MOTOR HEIGHT.
+					//Serial.print(iMotorPosition); Serial.print(","); 		// Current MOTOR HEIGHT.
+					Serial.print(getActuatorTarget()); Serial.print(","); 			// Target MOTOR HEIGHT.
+					//Serial.print(iTargetPos); Serial.print(","); 			// Target MOTOR HEIGHT.
 					Serial.print(iTargetR); Serial.print(","); 				// Target RED
 					Serial.print(iTargetG); Serial.print(","); 				// Target GREEN
 					Serial.print(iTargetB); Serial.print("\n"); 			// Target BLUE.
@@ -1273,8 +1376,10 @@ void loop() {
 		static unsigned long tmrSample = 0;
 		if (cycleCheck(&tmrSample, PROFILING_RATE))
 		{
-			Serial.print(iMotorPosition); Serial.print(","); 	// Current MOTOR HEIGHT.
-			Serial.print(iTargetPos); Serial.print(","); 		// Target MOTOR HEIGHT.
+			//Serial.print(iMotorPosition); Serial.print(","); 	// Current MOTOR HEIGHT.
+			Serial.print(getActuatorCurrent()); Serial.print(","); 	// Current MOTOR HEIGHT.
+			//Serial.print(iTargetPos); Serial.print(","); 		// Target MOTOR HEIGHT.
+			Serial.print(getActuatorTarget()); Serial.print(","); 		// Target MOTOR HEIGHT.
 			Serial.print(iTargetR); Serial.print(","); 			// Target RED
 			Serial.print(iTargetG); Serial.print(","); 			// Target GREEN
 			Serial.print(iTargetB); Serial.print("\n"); 		// Target BLUE.
