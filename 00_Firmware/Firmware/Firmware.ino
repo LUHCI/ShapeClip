@@ -47,7 +47,6 @@
 #include <Math.h>
 #include <EEPROM.h>
 #include <util/parity.h>
-#include "CoolStepper.h" 
 #include "LDR.h"
 #include "Adafruit_NeoPixel.h"
 #include "WindowVariance.h"
@@ -82,6 +81,9 @@ int iActuatorTarget  = 0;		// Actuator target position/angle/speed.
 
 /* Actuation characteristics */
 #ifdef ACTUATOR_STEPPER
+	
+	#include "CoolStepper.h" 		// Stepper library that shuts down.
+	
 	#define STEPPER_ANGLE 	20		// The degrees turned with each motor step.
 	#define STEPPER_SPEED 	1500	// The motor speed in rotations per minute (RPMs).
 	#define STEPPER_TRAVEL 	470		// The number of steps to move the nut from the top to the bottom.
@@ -227,6 +229,7 @@ int iActuatorTarget  = 0;		// Actuator target position/angle/speed.
 
 #ifdef ACTUATOR_SERVO
 	#include <Servo.h>				// http://playground.arduino.cc/Learning/SingleServoExample
+	
 	Servo servo;
 	#define SERVO_MAX_PULSE 2000	// 
 	#define SERVO_MIN_PULSE 700		// 
