@@ -1,0 +1,20 @@
+##############################################################
+
+spata.name=ShapeClipV3 - ATmega328
+
+spata.upload.protocol=usbtiny
+spata.upload.maximum_size=30720
+spata.upload.speed=57600
+
+spata.bootloader.low_fuses=0xFF
+spata.bootloader.high_fuses=0xDA
+spata.bootloader.extended_fuses=0x05
+spata.bootloader.path=atmega
+spata.bootloader.file=ATmegaBOOT_168_atmega328.hex
+spata.bootloader.unlock_bits=0x3F
+spata.bootloader.lock_bits=0x0F
+
+spata.build.mcu=atmega328p
+spata.build.f_cpu=16000000L
+spata.build.core=arduino
+spata.build.variant=standard
