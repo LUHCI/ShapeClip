@@ -14,6 +14,7 @@ Software
 =====
 
 There are 4 main software packages included here:
+
 1. Clip Firmware + Extensions
 2. SDSL Driver and Websocket/Serial Bridge
 3. SUR40 Clip Detector (OpenCV)
