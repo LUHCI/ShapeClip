@@ -1,16 +1,23 @@
-ShapeClip: Towards Rapid Prototyping with Shape-Changing Displays for Designers
-=========
+# ShapeClip
+
+## Towards Rapid Prototyping with Shape-Changing Displays for Designers
 
 ShapeClip is a modular tool capable of transforming any computer screen into a z-actuating shape-changing display. This enables designers to produce dynamic physical forms by simply ‘clipping’ actuators onto screens.
 
 ShapeClip displays are portable, scalable, fault-tolerant, and support runtime actuator re-arrangement. Users are not required to have knowledge of electronics or programming, and can develop motion designs with presentation software, image editors, and for those who require more control, web-standard interfaces.
 
-Getting Started
-=====
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=5YozIqFVEgY
+" target="_blank"><img src="http://img.youtube.com/vi/5YozIqFVEgY/0.jpg" 
+alt="ShapeClip" width="240" height="180" border="10" /></a>
 
-To get started you will need to get your hands on some ShapeClip hardware. 
+## Research
 
-To do that, you can view our design documents in the 01_Hardware folder.
+You can view our paper online here: ...
+
+To cite the paper, use the following citation: ...
+
+
+## Getting Started
 
 There are 4 main software packages included here:
 
@@ -21,9 +28,12 @@ There are 4 main software packages included here:
 
 In terms of software that can be used to create motion designs, ShapeClip is not restricted to any particular software package. You are free to work with the tools you know.
 
+To get started you will need to get your hands on some ShapeClip hardware.To do that, you can view our design documents in the 01_Hardware folder.
 
-License
-=====
+[http://i.imgur.com/Qs7ZSov.png]
+
+## License
+
 Copyright (c) Lancaster University, GHOST Project
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
