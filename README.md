@@ -14,10 +14,11 @@ alt="ShapeClip" width="240" height="180" border="10" /></a>
 
 There are 4 main software packages included here:
 
-1. Clip Firmware + Extensions
-2. SDSL Driver and Websocket/Serial Bridge
-3. SUR40 Clip Detector (OpenCV)
-4. Web-based Applications
+1. [Clip Firmware](../blob/master/00_Firmware/Firmware/Firmware.ino)
+2. [Websocket/Serial Bridge](../blob/master/10_Driver/wsserial)
+3. [SUR40 Clip Detector (OpenCV)](../blob/master/15_Middleware/ShapeClipDetector)
+4. [Javascript API](../blob/master/10_Driver/ShapeClipAPI.js)
+5. [Web-based Sample Apps](../blob/master/20_Applications)
 
 In terms of software that can be used to create motion designs, ShapeClip is not restricted to any particular software package. You are free to work with the tools you know.
 
