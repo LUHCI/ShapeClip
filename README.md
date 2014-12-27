@@ -8,10 +8,9 @@ ShapeClip displays are portable, scalable, fault-tolerant, and support runtime a
 Getting Started
 =====
 
-To get started you will need to get your hands on some ShapeClip hardware. To do that, you can view our design documents here.
+To get started you will need to get your hands on some ShapeClip hardware. 
 
-Software
-=====
+To do that, you can view our design documents in the 01_Hardware folder.
 
 There are 4 main software packages included here:
 
