@@ -10,13 +10,6 @@ ShapeClip displays are portable, scalable, fault-tolerant, and support runtime a
 " target="_blank"><img src="http://img.youtube.com/vi/5YozIqFVEgY/0.jpg" 
 alt="ShapeClip" width="240" height="180" border="10" /></a>
 
-## Research
-
-You can view our paper online here: ...
-
-To cite the paper, use the following citation: ...
-
-
 ## Getting Started
 
 There are 4 main software packages included here:
@@ -30,7 +23,14 @@ In terms of software that can be used to create motion designs, ShapeClip is not
 
 To get started you will need to get your hands on some ShapeClip hardware.To do that, you can view our design documents in the 01_Hardware folder.
 
-[http://i.imgur.com/Qs7ZSov.png]
+![alt text](http://i.imgur.com/Qs7ZSov.png "ShapeClip mkIII Board")
+
+
+## Research
+
+You can view our paper online here: ...
+
+To cite the paper, use the following citation: ...
 
 ## License
 
