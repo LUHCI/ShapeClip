@@ -14,7 +14,7 @@ alt="ShapeClip" width="240" height="180" border="10" /></a>
 
 There are 4 main software packages included here:
 
-1. [Clip Firmware](../master/00_Firmware/Firmware/Firmware.ino)
+1. [Clip Firmware](../master/00_Firmware/Firmware/Firmware.ino) + [Servo Extensions](../Slider/00_Firmware/Firmware/Firmware.ino)
 2. [Websocket/Serial Bridge](../master/10_Driver/wsserial)
 3. [SUR40 Clip Detector (OpenCV)](../master/15_Middleware/ShapeClipDetector)
 4. [Javascript API](../master/10_Driver/ShapeClipAPI.js)
