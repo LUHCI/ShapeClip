@@ -28,9 +28,11 @@ To get started you will need to get your hands on some ShapeClip hardware.To do 
 
 ## Research
 
-You can view our paper online here: ...
+This work was conducted as part of the GHOST project (http://ghostfet-prod.cs.bris.ac.uk/) to further the understanding of shape-changing computer interfaces.
 
-To cite the paper, use the following citation: ...
+You can view our paper (CHI2015) online here. To cite the paper, use the following citation: ...
+
+![alt text](http://www.ghost-fet.com/wordpress/wp-content/uploads/2012/11/chosen_logo_web.png "GHOST Logo")
 
 ## License
 
