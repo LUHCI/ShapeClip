@@ -24,7 +24,11 @@ In terms of software that can be used to create motion designs, ShapeClip is not
 
 To get started you will need to get your hands on some ShapeClip hardware.To do that, you can view our design documents in the 01_Hardware folder.
 
+The following image is a trace (from Eagle) of the ShapeClip mkIII board. The different colours denote different layers of the circuit.
 ![alt text](http://i.imgur.com/Qs7ZSov.png "ShapeClip mkIII Board")
+
+Each standard Clip weighs ≈30g, and is 20×20×80mm when closed, and costs ≈USD$15. The selected stepper motor has 60mm of travel. Under stress, individual Clips draw between 60–540mA at 5V, enabling small groups to be powered via USB. When powering larger numbers, be sure not to make the chain of clips too long as you may damage the Clips. Clips are connected together with pin connectors that double up as a power transmission method. When the Clip is held upright, the top two pins of the power connector are +5v and the bottom one is GND. The motor and circuit logic are kept separate in the top two pins, but in most scenarios they can share power.
+![alt text](http://i.imgur.com/N9nX0mO.png "ShapeClip mkIII Board")
 
 
 ## Research
